@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リスティンググループ商品ボード｜ももやま</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    color: #1a1a1a;
+    background: #ffffff;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+  }
+  .hero-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 20px 24px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #1f2430, #2b3142);
+    border-radius: 16px;
+    color: #fff;
+  }
+  .hero-left .title { font-weight: 700; font-size: 18px; opacity: 0.85; margin-bottom: 4px; }
+  .hero-left .period { font-size: 12px; opacity: 0.6; }
+  .badge-auto {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.15);
+    vertical-align: middle;
+  }
+  .hero-right { text-align: right; }
+  .hero-roas-label { font-size: 11.5px; opacity: 0.75; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .hero-roas-value { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
+  .hero-roas-value .unit { font-size: 22px; font-weight: 700; margin-left: 2px; }
+  .hero-roas-sub { font-size: 11.5px; opacity: 0.65; margin-top: 4px; }
+  .below-target { color: #ff8a80; }
+  .above-target { color: #8affa0; }
+  .notice-bar {
+    font-size: 11px;
+    color: #4a6b3a;
+    background: #f0f7ea;
+    border: 1px solid #cfe6bc;
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    line-height: 1.7;
+  }
+  .legend-bar {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    align-items: center;
+    padding: 8px 4px 16px;
+    flex-wrap: wrap;
+  }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(230px, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 950px) {
+    .board-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  .ag-col {
+    background: #f7f6f2;
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .ag-header {
+    padding: 4px 4px 10px 4px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    margin-bottom: 2px;
+  }
+  .ag-name { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .ag-metrics { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #6b6b6b; flex-wrap: wrap; }
+  .roas-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 12.5px;
+    color: #fff;
+  }
+  .roas-badge.small { font-size: 11.5px; padding: 2px 8px; }
+  .g-good { background: #2e9e5b; }
+  .g-mid  { background: #d99a1f; }
+  .g-bad  { background: #d64545; }
+  .card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+    border-left: 4px solid transparent;
+    display: flex;
+    gap: 9px;
+  }
+  .card.g-good { border-left-color: #2e9e5b; background: rgba(46,158,91,0.06); }
+  .card.g-mid  { border-left-color: #d99a1f; background: rgba(217,154,31,0.06); }
+  .card.g-bad  { border-left-color: #d64545; background: rgba(214,69,69,0.07); }
+  .card-thumb {
+    width: 52px;
+    height: 52px;
+    flex: none;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #eee;
+  }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title {
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  .card-id {
+    font-size: 9.5px;
+    color: #9a9a9a;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    margin-bottom: 5px;
+    word-break: break-all;
+  }
+  .card-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #6b6b6b;
+    gap: 6px;
+  }
+  .card-stats .roas-badge { font-size: 12.5px; flex: none; }
+  .footnote {
+    margin-top: 18px;
+    font-size: 11.5px;
+    color: #9a9a9a;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<div id="board-root"></div>
+<script>
+(function(){
+  const products = [{"ag": "還暦祝い", "title": "【還暦祝い 似顔絵】 赤い マグカップ にがおえキャラ・フレンチシャビー | 誕生日 記念日 プレゼント | ギフトBOX付き 美濃焼", "id": "shopify_jp_8962622718210_45986594291970", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtVuBdTgpHUHeg_zk3c137NvYbyQuNgisHWe6lBxtlaxGRLNQSxHfxt2EUxG_GLzDQrIcgg8TajUHONe", "cost": 15132.48, "cv": 4.9685, "value": 57923.22, "roas": 382.8}, {"ag": "還暦祝い", "title": "【還暦祝い 名入れ】 純金文字 赤い マグカップ シノワズリ・フレンチシャビー | プレゼント 記念日 女性 | ギフトBOX付 美濃焼", "id": "shopify_jp_8184166023426_43918378631426", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtUn0CkGFiDkGxioPU7LQnTN5Fc5BW0gXNfHLt9q4mQ3eKIVzboJLZhBjoRPyaC9rrWEGk5_fCZIR7Ju", "cost": 8599.58, "cv": 2.7486, "value": 18788.65, "roas": 218.5}, {"ag": "誕生日祝い", "title": "ワイングラス 似顔絵 にがおえキャラ・ワイン | 還暦祝い 誕生日 退職祝い プレゼント | ギフトBOX付き オーダーメイド", "id": "shopify_jp_7948701368578_43559655244034", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtX3BGC2474kUTWRxdqITYGkAWSF5OOPf_imBvZJrotgJv5_JTMGO3EmsMW3OZMQr9x1z4MimQaYtBOf", "cost": 10200.83, "cv": 5.1667, "value": 51241.74, "roas": 502.3}, {"ag": "誕生日祝い", "title": "【すぐ届く】 マグカップ ドリップコーヒー ギフトセット SARAKU・アースカラー | 誕生日 プレゼント 退職祝い | ギフトBOX付き", "id": "shopify_jp_7978165338370_43626051797250", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtUW9UuXGNNJiGpSx1W1AQlIwpe7BLY2ok9VaZYPvftsHDHuP3FVw9qXSDBbvrZgTn6D334ArKXh2ovG", "cost": 15037.11, "cv": 5.5, "value": 40150.0, "roas": 267.0}, {"ag": "誕生日祝い", "title": "マグカップ 名入れ ノーチェ | 誕生日 プレゼント 送別 記念日 | ギフトBOX付 オリジナル 北欧 おしゃれ コーヒーカップ", "id": "shopify_jp_8338126766338_44260791091458", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtUBPP7-oNyze9F3moellB06nCYPdhGR67m390OEb0Fmf-mdNUWt7OAXM2q7EpQZkCS-04oz21FF00xm", "cost": 12943.05, "cv": 2.8333, "value": 26520.0, "roas": 204.9}, {"ag": "誕生日祝い", "title": "【似顔絵】ビアグラス にがおえキャラ・ビールジョッキ | 還暦祝い 誕生日 プレゼント 記念日 | ギフトBOX付き オリジナル", "id": "shopify_jp_7948697010434_43559647838466", "img": "https://cdn.shopify.com/s/files/1/0606/8312/4994/products/box-924610.jpg?v=1747099943", "cost": 27516.02, "cv": 11.5338, "value": 96490.41, "roas": 350.7}, {"ag": "還暦祝い", "title": "【還暦祝い・似顔絵】 赤い マグカップ にがおえキャラ・還暦ラフラン | 母 女性 友人 誕生日 プレゼント | ギフトBOX付き 美濃焼", "id": "shopify_jp_8762128564482_45386627744002", "img": "https://cdn.shopify.com/s/files/1/0606/8312/4994/files/DSC_4396-1_obigousei.jpg?v=1770954055", "cost": 12005.13, "cv": 5.618, "value": 53343.59, "roas": 444.3}, {"ag": "Best-Selling(似顔絵)", "title": "【結婚祝い 似顔絵】 ペア ビアグラス にがおえキャラ・ビールジョッキ | カップル 記念日 友達 プレゼント | ギフトBOX付き オリジナル", "id": "shopify_jp_8151059431682_43860134068482", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtWvkho9v9QzNPf8dhEhdX0vf2aUN6bvzKLmDBSKPIqS4pgLBsQT0Pj6rknMU67104Ecov-7Nq65oVbm", "cost": 52266.11, "cv": 15.4879, "value": 218853.56, "roas": 418.7}, {"ag": "Best-Selling(名入れ)", "title": "【還暦祝い】 純金 名入れ マグカップ 赤い フレンチシャビー | レビュー高評価 誕生日 プレゼント 女性 | 還暦ギフト専用BOX付き 美濃焼", "id": "shopify_jp_8929460093186_45894576865538", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtUd82YemBIkJVu-n7rAColocrPFjI8_V6cevNu3JKJJ6q1dOuQ76AutTbusqjfmKon4Q_CxegJqEHHo", "cost": 44169.04, "cv": 26.3459, "value": 156245.82, "roas": 353.7}, {"ag": "Best-Selling(似顔絵)", "title": "【還暦祝い】 マグカップ 似顔絵 にがおえキャラ・還暦祝いマディ | 60歳 誕生日 プレゼント | ギフトBOX付き オリジナル", "id": "shopify_jp_8749894533378_45357512982786", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtV-iNKi9zARHHgXm6U167-UBXShCO5U1i3CkmurAnPh62dIlAltzNhMW5-YGcyzqHhPKEj8fPHmeBtd", "cost": 46193.14, "cv": 18.2191, "value": 183701.04, "roas": 397.7}, {"ag": "Best-Selling(名入れ)", "title": "【結婚祝い 記念日】 ペア 名入れ マグカップ フレンチシャビー | 友達 両親 お揃い プレゼント | ギフトBOX付 オリジナル", "id": "shopify_jp_7923695485186_43576247288066", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtUheVW9YC2vkHPDKLkH42BeI1DdmZacdWk0B-EXp8k_0lZ5-aDIb9fnDJUgEQHtFngkYKHYRpBZSqG7", "cost": 28851.35, "cv": 13.5535, "value": 123321.94, "roas": 427.4}, {"ag": "Best-Selling(名入れ)", "title": "【還暦祝い】 純金 名入れ マグカップ フレンチシャビー | レビュー高評価 5色展開 誕生日プレゼント 女性 | ギフトBOX付き 美濃焼", "id": "shopify_jp_7746058256642_43007656919298", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtVByJvOsFqL_rkPTqHEjGm_rdP3Pav2BP6tJM-xfOzofUuUu2iPecvHVYBUftAiilyXvk1q9kJ54z4_", "cost": 22604.07, "cv": 9.5296, "value": 53360.42, "roas": 236.1}, {"ag": "Best-Selling(名入れ)", "title": "【結婚祝い】夫婦茶碗 ペア 名入れ 茶碗 | 記念日 お揃い 友達 両親 プレゼント | ギフトBOX付 モダン おしゃれ オリジナル", "id": "shopify_jp_8777112977666_45421988380930", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtXYoJ87mX3tSHU0iQoFWQGxdyTkhaUhsbf6BYrqsy193JBBVIEUWFWbDwBjZ8W2_fXpISnB97U76bAv", "cost": 32401.42, "cv": 16.2962, "value": 132263.63, "roas": 408.2}, {"ag": "Best-Selling(似顔絵)", "title": "【結婚祝い・似顔絵】 マグカップ ペア にがおえキャラ・クレマ | プレゼント 記念日 カップル お揃い | ギフトBOX付き オリジナル", "id": "shopify_jp_8056676679938_43748739678466", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtXS1jSowRTvklsysfUl5moTR7sWTnF5JEkf9DUxboD9Xw_b8GID2Q08q-i8op7Bdd-N5PLQOnSqPdds", "cost": 83324.19, "cv": 20.2693, "value": 306010.97, "roas": 367.3}, {"ag": "Best-Selling(似顔絵)", "title": "【結婚祝い・似顔絵】 ワイングラス ペア にがおえキャラ・ワイン | 記念日 プレゼント カップル お揃い | ギフトBOX付き オリジナル", "id": "shopify_jp_7948721717506_43559694401794", "img": "https://shopping.googleusercontent.com/image?q=AJqGhtWtBgTokroK6v0hTEfPo-6_QXW3Uh43XVvH0LxyKk2N787IKp9XYMfiPMFpk64Qcvo23GSV9YI9Ot8N", "cost": 36611.01, "cv": 10.8509, "value": 133180.88, "roas": 363.8}, {"ag": "還暦祝い", "title": "【還暦祝い・すぐ届く】 赤い 上質 マグカップ フレンチシャビー | 誕生日 プレゼント メッセージ入り| ギフトBOX付 コーヒー・日本茶 ギフトセット 美濃焼", "id": "shopify_jp_9484565414146_48084896809218", "img": "https://cdn.shopify.com/s/files/1/0606/8312/4994/files/OR_kanreki_0703.jpg?v=1783310052", "cost": 17283.59, "cv": 9.2773, "value": 58460.71, "roas": 338.2}];
+  const AG_ORDER = ["還暦祝い", "誕生日祝い", "Best-Selling(似顔絵)", "Best-Selling(名入れ)"];
+  const PERIOD_TEXT = "2026-06-29〜2026-07-28／稼働中4AG（還暦祝い・誕生日祝い・Best-Selling(似顔絵)・Best-Selling(名入れ)）・全16商品";
+  const GENERATED_AT = "2026-07-28 15:18 JST";
+  const ROAS_GOOD = 420;
+  const ROAS_MID = 300;
+
+  function grade(roas){
+    if (roas >= ROAS_GOOD) return "g-good";
+    if (roas >= ROAS_MID) return "g-mid";
+    return "g-bad";
+  }
+  function yen(n){ return "¥" + Math.round(n).toLocaleString("ja-JP"); }
+
+  const root = document.getElementById("board-root");
+
+  const totalCost = products.reduce((s,p)=>s+p.cost,0);
+  const totalValue = products.reduce((s,p)=>s+p.value,0);
+  const overallRoas = (totalCost > 0 ? (totalValue/totalCost*100) : 0).toFixed(1);
+  const belowTarget = Number(overallRoas) < ROAS_GOOD;
+
+  const hero = document.createElement("div");
+  hero.className = "hero-bar";
+  hero.innerHTML = `
+    <div class="hero-left">
+      <div class="title">リスティンググループ商品ボード｜ももやま<span class="badge-auto">自動取得パイプライン</span></div>
+      <div class="period">${PERIOD_TEXT}</div>
+    </div>
+    <div class="hero-right">
+      <div class="hero-roas-label">全体ROAS</div>
+      <div class="hero-roas-value">${overallRoas}<span class="unit">%</span></div>
+      <div class="hero-roas-sub ${belowTarget ? 'below-target' : 'above-target'}">基準${ROAS_GOOD}%${belowTarget ? 'に対し未達' : '以上を達成'}</div>
+    </div>
+  `;
+  root.appendChild(hero);
+
+  const notice = document.createElement("div");
+  notice.className = "notice-bar";
+  notice.innerHTML = `✅ 自動取得パイプライン：①Google Ads(asset_group_status)で稼働中AGを特定 → ②Google Merchant Center(product_custom_label_0)で現在の商品⇄AGラベルを取得 → ③Google Ads(item_id別)で費用・コンバージョンを取得 → ④突合。毎朝自動更新（最終更新：${GENERATED_AT}）。`;
+  root.appendChild(notice);
+
+  const legend = document.createElement("div");
+  legend.className = "legend-bar";
+  legend.innerHTML = `
+    <span><span class="legend-dot" style="background:#2e9e5b;"></span>ROAS ${ROAS_GOOD}%以上（基準達成）</span>
+    <span><span class="legend-dot" style="background:#d99a1f;"></span>${ROAS_MID}〜${ROAS_GOOD-1}%</span>
+    <span><span class="legend-dot" style="background:#d64545;"></span>${ROAS_MID}%未満（入替候補）</span>
+  `;
+  root.appendChild(legend);
+
+  const grid = document.createElement("div");
+  grid.className = "board-grid";
+
+  AG_ORDER.forEach(ag => {
+    const items = products.filter(p => p.ag === ag).sort((a,b)=> b.roas - a.roas);
+    const cost = items.reduce((s,p)=>s+p.cost,0);
+    const cv = items.reduce((s,p)=>s+p.cv,0);
+    const value = items.reduce((s,p)=>s+p.value,0);
+    const agRoas = (cost > 0 ? (value/cost*100) : 0).toFixed(1);
+
+    const col = document.createElement("div");
+    col.className = "ag-col";
+
+    const header = document.createElement("div");
+    header.className = "ag-header";
+    header.innerHTML = `
+      <div class="ag-name">${ag}</div>
+      <div class="ag-metrics">
+        <span class="roas-badge small ${grade(agRoas)}">${agRoas}%</span>
+        <span>費用 ${yen(cost)}</span>
+        <span>CV ${cv.toFixed(1)}</span>
+        <span>商品 ${items.length}件</span>
+      </div>
+    `;
+    col.appendChild(header);
+
+    items.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "card " + grade(p.roas);
+      card.title = p.title;
+      const thumb = p.img ? `<img class="card-thumb" src="${p.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="card-thumb"></div>`;
+      card.innerHTML = `
+        ${thumb}
+        <div class="card-body">
+          <div class="card-title">${p.title}</div>
+          <div class="card-id">${p.id}</div>
+          <div class="card-stats">
+            <span>費用 ${yen(p.cost)} ／ CV ${p.cv.toFixed(1)}</span>
+            <span class="roas-badge ${grade(p.roas)}">${p.roas.toFixed(1)}%</span>
+          </div>
+        </div>
+      `;
+      col.appendChild(card);
+    });
+
+    grid.appendChild(col);
+  });
+
+  root.appendChild(grid);
+
+  const foot = document.createElement("div");
+  foot.className = "footnote";
+  foot.innerHTML = `データソース：Windsor.ai経由（google_ads: asset_group_status／google_merchant: product_custom_label_0／google_ads: item_id別実績、直近30日）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
+  root.appendChild(foot);
+})();
+</script>
+</body>
+</html>
