@@ -56,6 +56,53 @@
     margin-bottom: 14px;
     line-height: 1.7;
   }
+  .period-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .period-presets { display: flex; gap: 6px; }
+  .period-btn {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.12);
+    background: #f4f3ef;
+    color: #4a4a4a;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .period-btn.active { background: #2b3142; color: #fff; border-color: #2b3142; }
+  .period-custom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #6b6b6b;
+  }
+  .period-custom input[type="date"] {
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+    font-family: inherit;
+    color: #1a1a1a;
+  }
+  .period-custom button {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: none;
+    background: #1f2430;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+  }
   .legend-bar {
     display: flex;
     gap: 16px;
@@ -87,7 +134,7 @@
     margin-bottom: 2px;
   }
   .ag-name { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
-  .ag-metrics { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #6b6b6b; flex-wrap: wrap; }
+  .ag-metrics { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: #6b6b6b; flex-wrap: wrap; white-space: nowrap; }
   .roas-badge {
     display: inline-block;
     padding: 2px 9px;
@@ -96,10 +143,11 @@
     font-size: 12.5px;
     color: #fff;
   }
-  .roas-badge.small { font-size: 11.5px; padding: 2px 8px; }
+  .roas-badge.small { font-size: 13px; padding: 3px 10px; }
   .g-good { background: #2e9e5b; }
   .g-mid  { background: #d99a1f; }
   .g-bad  { background: #d64545; }
+  .g-none { background: #adaba3; }
   .card {
     background: #ffffff;
     border-radius: 10px;
@@ -112,13 +160,27 @@
   .card.g-good { border-left-color: #2e9e5b; background: rgba(46,158,91,0.06); }
   .card.g-mid  { border-left-color: #d99a1f; background: rgba(217,154,31,0.06); }
   .card.g-bad  { border-left-color: #d64545; background: rgba(214,69,69,0.07); }
-  .card-thumb {
-    width: 52px;
-    height: 52px;
+  .card.g-none { border-left-color: #adaba3; background: rgba(0,0,0,0.02); }
+  .card-thumb-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
     flex: none;
-    border-radius: 8px;
+    width: 76px;
+  }
+  .card-thumb {
+    width: 76px;
+    height: 76px;
+    border-radius: 9px;
     object-fit: cover;
     background: #eee;
+    display: block;
+  }
+  .roas-badge-thumb {
+    font-size: 12.5px;
+    padding: 3px 10px;
+    white-space: nowrap;
   }
   .card-body { flex: 1; min-width: 0; }
   .card-title {
@@ -131,18 +193,32 @@
     font-size: 9.5px;
     color: #9a9a9a;
     font-family: ui-monospace, SFMono-Regular, monospace;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
     word-break: break-all;
   }
-  .card-stats {
+  .card-stats-secondary {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    color: #6b6b6b;
-    gap: 6px;
+    gap: 5px;
+    flex-wrap: wrap;
   }
-  .card-stats .roas-badge { font-size: 12.5px; flex: none; }
+  .stat-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.1);
+    font-size: 11px;
+    font-weight: 700;
+    color: #4d5449;
+    white-space: nowrap;
+  }
+  .stat-chip .stat-label {
+    font-weight: 500;
+    font-size: 9.5px;
+    color: #8a8f84;
+  }
   .footnote {
     margin-top: 18px;
     font-size: 11.5px;
@@ -155,110 +231,190 @@
 <div id="board-root"></div>
 <script>
 (function(){
-  const products = __PRODUCTS_JSON__;
+  const DATES = __DATES_JSON__;              // ["2026-04-30", ..., "2026-07-28"], oldest -> newest
+  const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
-  const PERIOD_TEXT = "__PERIOD_TEXT__";
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
+  const DEFAULT_PRESET_DAYS = __DEFAULT_PRESET_DAYS__;
+
+  const LAST_IDX = DATES.length - 1;
+  let rangeStart = Math.max(0, DATES.length - DEFAULT_PRESET_DAYS);
+  let rangeEnd = LAST_IDX;
+  let activePresetDays = DEFAULT_PRESET_DAYS;
 
   function grade(roas){
+    if (roas === null) return "g-none";
     if (roas >= ROAS_GOOD) return "g-good";
     if (roas >= ROAS_MID) return "g-mid";
     return "g-bad";
   }
   function yen(n){ return "¥" + Math.round(n).toLocaleString("ja-JP"); }
+  function pct(roas){ return roas === null ? "—" : roas.toFixed(1) + "%"; }
+  function dateIndex(dateStr){ return DATES.indexOf(dateStr); }
+
+  function aggregate(product, s, e){
+    let cost = 0, cv = 0, value = 0;
+    for (let i = s; i <= e; i++){
+      cost += product.cost[i];
+      cv += product.cv[i];
+      value += product.value[i];
+    }
+    const roas = cost > 0 ? (value / cost * 100) : null;
+    return { cost, cv, value, roas };
+  }
 
   const root = document.getElementById("board-root");
 
-  const totalCost = products.reduce((s,p)=>s+p.cost,0);
-  const totalValue = products.reduce((s,p)=>s+p.value,0);
-  const overallRoas = (totalCost > 0 ? (totalValue/totalCost*100) : 0).toFixed(1);
-  const belowTarget = Number(overallRoas) < ROAS_GOOD;
+  function renderBoard(){
+    root.innerHTML = "";
 
-  const hero = document.createElement("div");
-  hero.className = "hero-bar";
-  hero.innerHTML = `
-    <div class="hero-left">
-      <div class="title">リスティンググループ商品ボード｜ももやま<span class="badge-auto">自動取得パイプライン</span></div>
-      <div class="period">${PERIOD_TEXT}</div>
-    </div>
-    <div class="hero-right">
-      <div class="hero-roas-label">全体ROAS</div>
-      <div class="hero-roas-value">${overallRoas}<span class="unit">%</span></div>
-      <div class="hero-roas-sub ${belowTarget ? 'below-target' : 'above-target'}">基準${ROAS_GOOD}%${belowTarget ? 'に対し未達' : '以上を達成'}</div>
-    </div>
-  `;
-  root.appendChild(hero);
+    const startDate = DATES[rangeStart];
+    const endDate = DATES[rangeEnd];
+    const stats = products.map(p => ({ p, agg: aggregate(p, rangeStart, rangeEnd) }));
 
-  const notice = document.createElement("div");
-  notice.className = "notice-bar";
-  notice.innerHTML = `✅ 自動取得パイプライン：①Google Ads(asset_group_status)で稼働中AGを特定 → ②Google Merchant Center(product_custom_label_0)で現在の商品⇄AGラベルを取得 → ③Google Ads(item_id別)で費用・コンバージョンを取得 → ④突合。毎朝自動更新（最終更新：${GENERATED_AT}）。`;
-  root.appendChild(notice);
+    const totalCost = stats.reduce((s,x)=>s+x.agg.cost,0);
+    const totalValue = stats.reduce((s,x)=>s+x.agg.value,0);
+    const overallRoas = totalCost > 0 ? (totalValue/totalCost*100) : null;
+    const overallRoasText = overallRoas === null ? "—" : overallRoas.toFixed(1);
+    const belowTarget = overallRoas === null || overallRoas < ROAS_GOOD;
 
-  const legend = document.createElement("div");
-  legend.className = "legend-bar";
-  legend.innerHTML = `
-    <span><span class="legend-dot" style="background:#2e9e5b;"></span>ROAS ${ROAS_GOOD}%以上（基準達成）</span>
-    <span><span class="legend-dot" style="background:#d99a1f;"></span>${ROAS_MID}〜${ROAS_GOOD-1}%</span>
-    <span><span class="legend-dot" style="background:#d64545;"></span>${ROAS_MID}%未満（入替候補）</span>
-  `;
-  root.appendChild(legend);
+    const presentAgCount = new Set(products.map(p=>p.ag)).size;
+    const periodText = `${startDate}〜${endDate}／稼働中${presentAgCount}AG（${AG_ORDER.join("・")}）・全${products.length}商品`;
 
-  const grid = document.createElement("div");
-  grid.className = "board-grid";
-
-  AG_ORDER.forEach(ag => {
-    const items = products.filter(p => p.ag === ag).sort((a,b)=> b.roas - a.roas);
-    const cost = items.reduce((s,p)=>s+p.cost,0);
-    const cv = items.reduce((s,p)=>s+p.cv,0);
-    const value = items.reduce((s,p)=>s+p.value,0);
-    const agRoas = (cost > 0 ? (value/cost*100) : 0).toFixed(1);
-
-    const col = document.createElement("div");
-    col.className = "ag-col";
-
-    const header = document.createElement("div");
-    header.className = "ag-header";
-    header.innerHTML = `
-      <div class="ag-name">${ag}</div>
-      <div class="ag-metrics">
-        <span class="roas-badge small ${grade(agRoas)}">${agRoas}%</span>
-        <span>費用 ${yen(cost)}</span>
-        <span>CV ${cv.toFixed(1)}</span>
-        <span>商品 ${items.length}件</span>
+    const hero = document.createElement("div");
+    hero.className = "hero-bar";
+    hero.innerHTML = `
+      <div class="hero-left">
+        <div class="title">リスティンググループ商品ボード｜ももやま<span class="badge-auto">自動取得パイプライン</span></div>
+        <div class="period">${periodText}</div>
+      </div>
+      <div class="hero-right">
+        <div class="hero-roas-label">全体ROAS</div>
+        <div class="hero-roas-value">${overallRoasText}<span class="unit">%</span></div>
+        <div class="hero-roas-sub ${belowTarget ? 'below-target' : 'above-target'}">基準${ROAS_GOOD}%${belowTarget ? 'に対し未達' : '以上を達成'}</div>
       </div>
     `;
-    col.appendChild(header);
+    root.appendChild(hero);
 
-    items.forEach(p => {
-      const card = document.createElement("div");
-      card.className = "card " + grade(p.roas);
-      card.title = p.title;
-      const thumb = p.img ? `<img class="card-thumb" src="${p.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="card-thumb"></div>`;
-      card.innerHTML = `
-        ${thumb}
-        <div class="card-body">
-          <div class="card-title">${p.title}</div>
-          <div class="card-id">${p.id}</div>
-          <div class="card-stats">
-            <span>費用 ${yen(p.cost)} ／ CV ${p.cv.toFixed(1)}</span>
-            <span class="roas-badge ${grade(p.roas)}">${p.roas.toFixed(1)}%</span>
-          </div>
-        </div>
-      `;
-      col.appendChild(card);
+    const notice = document.createElement("div");
+    notice.className = "notice-bar";
+    notice.innerHTML = `✅ 自動取得パイプライン：①Google Ads(asset_group_status)で稼働中AGを特定 → ②Google Merchant Center(product_custom_label_0)で現在の商品⇄AGラベルを取得 → ③Google Ads(item_id別・日別)で費用・コンバージョンを取得 → ④突合。毎朝自動更新（最終更新：${GENERATED_AT}）。表示期間は下のボタンで自由に切り替え可能（データは直近${DATES.length}日分を保持）。`;
+    root.appendChild(notice);
+
+    const periodBar = document.createElement("div");
+    periodBar.className = "period-bar";
+    const presets = [7, 30, 90].filter(d => d <= DATES.length);
+    periodBar.innerHTML = `
+      <div class="period-presets">
+        ${presets.map(d => `<button class="period-btn${activePresetDays===d ? ' active' : ''}" data-days="${d}">直近${d}日</button>`).join("")}
+      </div>
+      <div class="period-custom">
+        <input type="date" id="range-start-input" min="${DATES[0]}" max="${DATES[LAST_IDX]}" value="${startDate}">
+        <span>〜</span>
+        <input type="date" id="range-end-input" min="${DATES[0]}" max="${DATES[LAST_IDX]}" value="${endDate}">
+        <button id="range-apply-btn">適用</button>
+      </div>
+    `;
+    root.appendChild(periodBar);
+
+    periodBar.querySelectorAll(".period-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const days = parseInt(btn.dataset.days, 10);
+        rangeEnd = LAST_IDX;
+        rangeStart = Math.max(0, LAST_IDX - days + 1);
+        activePresetDays = days;
+        renderBoard();
+      });
+    });
+    periodBar.querySelector("#range-apply-btn").addEventListener("click", () => {
+      const sVal = periodBar.querySelector("#range-start-input").value;
+      const eVal = periodBar.querySelector("#range-end-input").value;
+      let sIdx = dateIndex(sVal);
+      let eIdx = dateIndex(eVal);
+      if (sIdx === -1 || eIdx === -1){
+        alert(`日付は${DATES[0]}〜${DATES[LAST_IDX]}の範囲で選択してください。`);
+        return;
+      }
+      if (sIdx > eIdx){ [sIdx, eIdx] = [eIdx, sIdx]; }
+      rangeStart = sIdx;
+      rangeEnd = eIdx;
+      activePresetDays = null;
+      renderBoard();
     });
 
-    grid.appendChild(col);
-  });
+    const legend = document.createElement("div");
+    legend.className = "legend-bar";
+    legend.innerHTML = `
+      <span><span class="legend-dot" style="background:#2e9e5b;"></span>ROAS ${ROAS_GOOD}%以上（基準達成）</span>
+      <span><span class="legend-dot" style="background:#d99a1f;"></span>${ROAS_MID}〜${ROAS_GOOD-1}%</span>
+      <span><span class="legend-dot" style="background:#d64545;"></span>${ROAS_MID}%未満（入替候補）</span>
+      <span><span class="legend-dot" style="background:#adaba3;"></span>期間内データなし</span>
+    `;
+    root.appendChild(legend);
 
-  root.appendChild(grid);
+    const grid = document.createElement("div");
+    grid.className = "board-grid";
 
-  const foot = document.createElement("div");
-  foot.className = "footnote";
-  foot.innerHTML = `データソース：Windsor.ai経由（google_ads: asset_group_status／google_merchant: product_custom_label_0／google_ads: item_id別実績、直近30日）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
-  root.appendChild(foot);
+    AG_ORDER.forEach(ag => {
+      const items = stats.filter(x => x.p.ag === ag)
+        .sort((a,b) => (b.agg.roas === null ? -1 : b.agg.roas) - (a.agg.roas === null ? -1 : a.agg.roas));
+      const cost = items.reduce((s,x)=>s+x.agg.cost,0);
+      const cv = items.reduce((s,x)=>s+x.agg.cv,0);
+      const value = items.reduce((s,x)=>s+x.agg.value,0);
+      const agRoas = cost > 0 ? (value/cost*100) : null;
+
+      const col = document.createElement("div");
+      col.className = "ag-col";
+
+      const header = document.createElement("div");
+      header.className = "ag-header";
+      header.innerHTML = `
+        <div class="ag-name">${ag}</div>
+        <div class="ag-metrics">
+          <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
+          <span>費用 ${yen(cost)}</span>
+          <span>CV ${cv.toFixed(1)}</span>
+          <span>商品 ${items.length}件</span>
+        </div>
+      `;
+      col.appendChild(header);
+
+      items.forEach(({p, agg}) => {
+        const card = document.createElement("div");
+        card.className = "card " + grade(agg.roas);
+        card.title = p.title;
+        const thumb = p.img ? `<img class="card-thumb" src="${p.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="card-thumb"></div>`;
+        card.innerHTML = `
+          <div class="card-thumb-wrap">
+            ${thumb}
+            <span class="roas-badge roas-badge-thumb ${grade(agg.roas)}">${pct(agg.roas)}</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">${p.title}</div>
+            <div class="card-id">${p.id}</div>
+            <div class="card-stats-secondary">
+              <span class="stat-chip"><span class="stat-label">費用</span>${yen(agg.cost)}</span>
+              <span class="stat-chip"><span class="stat-label">CV</span>${agg.cv.toFixed(1)}</span>
+            </div>
+          </div>
+        `;
+        col.appendChild(card);
+      });
+
+      grid.appendChild(col);
+    });
+
+    root.appendChild(grid);
+
+    const foot = document.createElement("div");
+    foot.className = "footnote";
+    foot.innerHTML = `データソース：Windsor.ai経由（google_ads: asset_group_status／google_merchant: product_custom_label_0／google_ads: item_id別・日別実績、直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
+    root.appendChild(foot);
+  }
+
+  renderBoard();
 })();
 </script>
 </body>
