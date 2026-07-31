@@ -56,6 +56,17 @@
     margin-bottom: 14px;
     line-height: 1.7;
   }
+  .stale-bar {
+    font-size: 12px;
+    font-weight: 700;
+    color: #7a2a1c;
+    background: #fdecea;
+    border: 1px solid #f3b7ab;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
   .period-bar {
     display: flex;
     justify-content: space-between;
@@ -238,6 +249,16 @@
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
   const DEFAULT_PRESET_DAYS = __DEFAULT_PRESET_DAYS__;
+  const STALE_THRESHOLD_HOURS = 30; // daily updates run ~24h apart; flag if it's been noticeably longer
+
+  function hoursSinceGenerated(){
+    const m = GENERATED_AT.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+    if (!m) return null;
+    const [, y, mo, d, h, mi] = m.slice(1).map(Number);
+    // GENERATED_AT is rendered in JST (UTC+9); convert to a true UTC instant to compare against "now".
+    const generatedUtcMs = Date.UTC(y, mo - 1, d, h, mi) - 9 * 60 * 60 * 1000;
+    return (Date.now() - generatedUtcMs) / 3600000;
+  }
 
   const LAST_IDX = DATES.length - 1;
   let rangeStart = Math.max(0, DATES.length - DEFAULT_PRESET_DAYS);
@@ -297,6 +318,15 @@
       </div>
     `;
     root.appendChild(hero);
+
+    const staleHours = hoursSinceGenerated();
+    if (staleHours !== null && staleHours >= STALE_THRESHOLD_HOURS){
+      const stale = document.createElement("div");
+      stale.className = "stale-bar";
+      const staleDaysText = staleHours >= 48 ? `約${Math.floor(staleHours/24)}日間` : `${Math.floor(staleHours)}時間`;
+      stale.innerHTML = `⚠️ このボードは${staleDaysText}更新されていません（最終更新：${GENERATED_AT}）。自動更新が失敗している可能性があります。GitHub Actionsの実行状況を確認してください。`;
+      root.appendChild(stale);
+    }
 
     const notice = document.createElement("div");
     notice.className = "notice-bar";
