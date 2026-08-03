@@ -2,25 +2,30 @@
 """Fetch AG x product performance from Windsor.ai and render the listing group board.
 
 Pipeline (see the Notion spec "仕様書：リスティンググループ商品ボード自動更新" for background):
-  1. google_ads:      campaign, asset_group_name, asset_group_status, asset_group_id
-                       -> which asset groups (AGs) are currently ENABLED.
+  1. google_ads:      campaign, campaign_status, asset_group_name, asset_group_status, asset_group_id
+                       -> which asset groups (AGs) are CURRENTLY enabled (both the AG itself and
+                       its parent campaign -- see quirk below). Used only for a "現在稼働中/一時
+                       停止中" status badge per column, NOT to decide which columns can appear.
   2. google_merchant:  product_id, product_custom_label_0, product_title, product_image_link
                        -> current product -> AG-label mapping (the source of truth; Google Ads'
                        own product-segment fields reflect click-time values, not current ones).
   3. google_ads:      date, campaign, product_item_id, cost, conversions, conversions_value
                        -> per-product, per-day performance (titles vary A/B, summed by item_id).
-  4. Join 2 and 3 on item_id, keep only items whose label maps to a currently-active AG.
+  4. Join 2 and 3 on item_id, keeping every item with a recognized label regardless of its AG's
+     current status. Which AG columns are actually shown for a given viewer-selected date range
+     is decided client-side, per range, based on whether that AG had any spend in it -- so
+     pausing a campaign doesn't erase its pre-pause history from the board (see board_template.html).
 
 Step 3 fetches a rolling HISTORY_DAYS-day window at daily granularity (not pre-aggregated) so the
 published page can let viewers pick any sub-range (7d/30d/90d presets or a custom range) and
 re-aggregate/re-render entirely client-side -- no backend, still a static GitHub Pages site.
 
-Two real-data quirks confirmed against the live account (2026-07-28) that the source spec did not
-mention:
+Real-data quirks confirmed against the live account that the source spec did not mention:
   - google_merchant product_id ("shopify_JP_...") and google_ads product_item_id
-    ("shopify_jp_...") differ in case. All joins below normalize to lowercase.
-  - asset_group_status is directly queryable as ENABLED/PAUSED -- no need for the "paused AGs
-    don't appear in the results" heuristic from the spec; filtering on the field is more robust.
+    ("shopify_jp_...") differ in case (2026-07-28). All joins below normalize to lowercase.
+  - asset_group_status stays ENABLED even when the parent campaign is paused (2026-08-03: the
+    Gift-Scene campaign was paused on 2026-07-31, but its asset groups kept reporting
+    asset_group_status=ENABLED) -- campaign_status must be checked too.
 """
 import argparse
 import json
@@ -208,13 +213,20 @@ def fetch_item_performance(client, date_from, date_to):
     return per_item
 
 
-def build_products(active_labels, product_labels, performance, date_list):
+def build_products(product_labels, performance, date_list):
     """Each product carries cost/cv/value as arrays aligned index-for-index with date_list, so
-    the page can sum any contiguous slice client-side without refetching anything."""
+    the page can sum any contiguous slice client-side without refetching anything.
+
+    Deliberately NOT filtered by current AG/campaign active status: a board meant to review
+    account-wide performance shouldn't silently drop an AG's entire history the moment it gets
+    paused (confirmed as a real problem on 2026-08-03 -- pausing the Gift-Scene campaign made
+    even its pre-pause history vanish from the board). Which AG columns are worth showing for a
+    given viewer-selected date range is instead decided client-side, per range, based on whether
+    that AG actually had spend in it -- see board_template.html."""
     products = []
     for item_id, by_date in performance.items():
         info = product_labels.get(item_id)
-        if not info or info["label"] not in active_labels:
+        if not info or info["label"] not in LABEL_TO_DISPLAY_AG:
             continue
         total_cost = sum(d["cost"] for d in by_date.values())
         if total_cost <= 0:
@@ -237,12 +249,24 @@ def build_products(active_labels, product_labels, performance, date_list):
     return products
 
 
+def build_ag_status(active_ag_names):
+    """Display-AG-name -> "ENABLED"/"PAUSED", reflecting the account's CURRENT state (used only
+    for a status badge on each column -- no longer used to decide which columns can appear)."""
+    status = {}
+    for raw_ag_name, labels in AG_TO_LABELS.items():
+        current = "ENABLED" if raw_ag_name in active_ag_names else "PAUSED"
+        for label in labels:
+            status[LABEL_TO_DISPLAY_AG[label]] = current
+    return status
+
+
 def render_html(products, date_list, active_ag_names, generated_at):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     present_ags = {p["ag"] for p in products}
     ag_order = [ag for ag in AG_DISPLAY_ORDER if ag in present_ags]
     ag_order += sorted(present_ags - set(ag_order))
+    ag_status = build_ag_status(active_ag_names)
 
     def js_string_escape(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -255,6 +279,7 @@ def render_html(products, date_list, active_ag_names, generated_at):
     html = html.replace("__DATES_JSON__", js_json(date_list))
     html = html.replace("__PRODUCTS_JSON__", js_json(products))
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
+    html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
     html = html.replace("__ROAS_MID__", str(ROAS_MID))
@@ -287,10 +312,10 @@ def main():
             sys.exit("WINDSOR_API_KEY is not set (expected as a GitHub Actions secret / env var).")
         client = WindsorClient(api_key)
 
-    active_labels, active_ag_names = fetch_active_labels(client, str(date_from), str(date_to))
+    _active_labels, active_ag_names = fetch_active_labels(client, str(date_from), str(date_to))
     product_labels = fetch_product_labels(client, str(date_from), str(date_to))
     performance = fetch_item_performance(client, str(date_from), str(date_to))
-    products = build_products(active_labels, product_labels, performance, date_list)
+    products = build_products(product_labels, performance, date_list)
 
     if not products:
         sys.exit(

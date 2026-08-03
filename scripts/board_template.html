@@ -145,6 +145,17 @@
     margin-bottom: 2px;
   }
   .ag-name { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .ag-status {
+    display: inline-block;
+    margin-left: 7px;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    vertical-align: middle;
+  }
+  .ag-status-on { background: rgba(46,158,91,0.13); color: #227a45; }
+  .ag-status-off { background: rgba(0,0,0,0.06); color: #7a7a72; }
   .ag-metrics { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: #6b6b6b; flex-wrap: wrap; white-space: nowrap; }
   .roas-badge {
     display: inline-block;
@@ -245,6 +256,7 @@
   const DATES = __DATES_JSON__;              // ["2026-04-30", ..., "2026-07-28"], oldest -> newest
   const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
+  const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
@@ -301,8 +313,21 @@
     const overallRoasText = overallRoas === null ? "—" : overallRoas.toFixed(1);
     const belowTarget = overallRoas === null || overallRoas < ROAS_GOOD;
 
-    const presentAgCount = new Set(products.map(p=>p.ag)).size;
-    const periodText = `${startDate}〜${endDate}／稼働中${presentAgCount}AG（${AG_ORDER.join("・")}）・全${products.length}商品`;
+    // Which AG columns to show for THIS date range: only ones with actual spend in it, so a
+    // paused campaign's pre-pause history still shows up when the range reaches back far enough,
+    // instead of the whole AG silently vanishing the moment it gets paused.
+    const agGroups = AG_ORDER.map(ag => {
+      const items = stats.filter(x => x.p.ag === ag)
+        .sort((a,b) => (b.agg.roas === null ? -1 : b.agg.roas) - (a.agg.roas === null ? -1 : a.agg.roas));
+      const cost = items.reduce((s,x)=>s+x.agg.cost,0);
+      const cv = items.reduce((s,x)=>s+x.agg.cv,0);
+      const value = items.reduce((s,x)=>s+x.agg.value,0);
+      const agRoas = cost > 0 ? (value/cost*100) : null;
+      return { ag, items, cost, cv, value, agRoas };
+    });
+    const shownAgGroups = agGroups.filter(g => g.cost > 0);
+
+    const periodText = `${startDate}〜${endDate}／表示中${shownAgGroups.length}AG（${shownAgGroups.map(g=>g.ag).join("・") || "該当なし"}）・全${products.length}商品`;
 
     const hero = document.createElement("div");
     hero.className = "hero-bar";
@@ -330,7 +355,7 @@
 
     const notice = document.createElement("div");
     notice.className = "notice-bar";
-    notice.innerHTML = `✅ 自動取得パイプライン：①Google Ads(asset_group_status)で稼働中AGを特定 → ②Google Merchant Center(product_custom_label_0)で現在の商品⇄AGラベルを取得 → ③Google Ads(item_id別・日別)で費用・コンバージョンを取得 → ④突合。毎朝自動更新（最終更新：${GENERATED_AT}）。表示期間は下のボタンで自由に切り替え可能（データは直近${DATES.length}日分を保持）。`;
+    notice.innerHTML = `✅ 自動取得パイプライン：①Google Merchant Center(product_custom_label_0)で商品⇄AGラベルを取得 → ②Google Ads(item_id別・日別)で費用・コンバージョンを取得 → ③突合。毎朝自動更新（最終更新：${GENERATED_AT}）。表示期間は下のボタンで自由に切り替え可能（データは直近${DATES.length}日分を保持）。各AG列は選択期間内に実績があるものだけを表示（現在の稼働状況は各列に表示）。`;
     root.appendChild(notice);
 
     const periodBar = document.createElement("div");
@@ -387,21 +412,22 @@
     const grid = document.createElement("div");
     grid.className = "board-grid";
 
-    AG_ORDER.forEach(ag => {
-      const items = stats.filter(x => x.p.ag === ag)
-        .sort((a,b) => (b.agg.roas === null ? -1 : b.agg.roas) - (a.agg.roas === null ? -1 : a.agg.roas));
-      const cost = items.reduce((s,x)=>s+x.agg.cost,0);
-      const cv = items.reduce((s,x)=>s+x.agg.cv,0);
-      const value = items.reduce((s,x)=>s+x.agg.value,0);
-      const agRoas = cost > 0 ? (value/cost*100) : null;
+    if (shownAgGroups.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "notice-bar";
+      empty.innerHTML = "選択した期間には実績のあるAGがありません。期間を広げてお試しください。";
+      root.appendChild(empty);
+    }
 
+    shownAgGroups.forEach(({ag, items, cost, cv, value, agRoas}) => {
       const col = document.createElement("div");
       col.className = "ag-col";
 
+      const isEnabled = AG_STATUS[ag] === "ENABLED";
       const header = document.createElement("div");
       header.className = "ag-header";
       header.innerHTML = `
-        <div class="ag-name">${ag}</div>
+        <div class="ag-name">${ag}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
         <div class="ag-metrics">
           <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
           <span>費用 ${yen(cost)}</span>
