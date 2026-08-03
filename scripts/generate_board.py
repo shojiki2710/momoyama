@@ -119,7 +119,7 @@ class FixtureClient:
     """
 
     _FILES = {
-        ("google_ads", ("campaign", "asset_group_name", "asset_group_status", "asset_group_id")): "step1_asset_groups.json",
+        ("google_ads", ("campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id")): "step1_asset_groups.json",
         ("google_merchant", ("product_id", "product_custom_label_0", "product_title", "product_image_link")): "step2_merchant_products.json",
         ("google_ads", ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value")): "step3_item_performance_daily.json",
     }
@@ -133,9 +133,14 @@ class FixtureClient:
 
 
 def fetch_active_labels(client, date_from, date_to):
+    """An asset group only actually serves when BOTH it and its parent campaign are enabled.
+    asset_group_status stays ENABLED even when the parent campaign is paused (confirmed live on
+    2026-08-02: the Gift-Scene campaign was paused on 2026-07-31, but every one of its asset
+    groups still reported asset_group_status=ENABLED) -- checking asset_group_status alone
+    silently over-counts AGs whose whole campaign has been paused."""
     rows = client.get_data(
         "google_ads",
-        ["campaign", "asset_group_name", "asset_group_status", "asset_group_id"],
+        ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
         accounts=[GOOGLE_ADS_ACCOUNT],
         date_from=date_from,
         date_to=date_to,
@@ -146,10 +151,11 @@ def fetch_active_labels(client, date_from, date_to):
         campaign = row.get("campaign") or ""
         if not any(k in campaign for k in CAMPAIGN_KEYWORDS):
             continue
-        ag_name = row.get("asset_group_name")
-        status = (row.get("asset_group_status") or "").upper()
-        if status != "ENABLED":
+        campaign_status = (row.get("campaign_status") or "").upper()
+        ag_status = (row.get("asset_group_status") or "").upper()
+        if campaign_status != "ENABLED" or ag_status != "ENABLED":
             continue
+        ag_name = row.get("asset_group_name")
         active_ag_names.add(ag_name)
         for label in AG_TO_LABELS.get(ag_name, []):
             active_labels.add(label)
