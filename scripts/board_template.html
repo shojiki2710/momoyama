@@ -325,7 +325,11 @@
       const agRoas = cost > 0 ? (value/cost*100) : null;
       return { ag, items, cost, cv, value, agRoas };
     });
-    const shownAgGroups = agGroups.filter(g => g.cost > 0);
+    // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
+    // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
+    const shownAgGroups = agGroups
+      .filter(g => g.cost > 0)
+      .sort((a, b) => (AG_STATUS[b.ag] === "ENABLED") - (AG_STATUS[a.ag] === "ENABLED"));
 
     const periodText = `${startDate}〜${endDate}／表示中${shownAgGroups.length}AG（${shownAgGroups.map(g=>g.ag).join("・") || "該当なし"}）・全${products.length}商品`;
 
