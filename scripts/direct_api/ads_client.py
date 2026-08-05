@@ -79,10 +79,14 @@ def fetch_listing_group_filters(client, customer_id):
     asset group's listing group filter actually targets, read straight from the account's real
     configuration instead of the hand-maintained AG_TO_LABELS dict in generate_board.py.
 
-    Only UNIT-type filter nodes are real leaf partitions with a concrete case_value; SUBDIVISION
-    nodes are branch points in the partition tree and are skipped here. A UNIT node with no
-    product_custom_attribute set (case_value on a different oneof member, or unset) represents an
-    "everything else" catch-all partition -- callers should treat that as "no specific label."
+    Only UNIT_INCLUDED/UNIT_EXCLUDED filter nodes are real leaf partitions with a concrete
+    case_value; SUBDIVISION nodes are branch points in the partition tree and are skipped here.
+    (Confirmed live 2026-08-05: the type enum is UNIT_INCLUDED/UNIT_EXCLUDED/SUBDIVISION, not a
+    plain "UNIT" -- an earlier draft of this function assumed the latter and silently matched
+    zero rows.) A UNIT node with no product_custom_attribute set (case_value on a different oneof
+    member, or unset) represents an "everything else" catch-all partition -- callers should treat
+    that as "no specific label." custom_label_index can be any of INDEX0-INDEX4, not just
+    INDEX0/custom_label_0 -- confirmed live some AGs partition on custom_label_1.
     """
     # NOTE: asset_group_listing_group_filter.type is not filterable in WHERE (confirmed live
     # 2026-08-05: GAQL rejects it with BAD_ENUM_CONSTANT even quoted correctly) -- filter for
@@ -101,12 +105,14 @@ def fetch_listing_group_filters(client, customer_id):
     rows = _run_search(client, customer_id, query)
     results = []
     for row in rows:
-        if row.asset_group_listing_group_filter.type.name != "UNIT":
+        node_type = row.asset_group_listing_group_filter.type.name
+        if node_type not in ("UNIT_INCLUDED", "UNIT_EXCLUDED"):
             continue
         attr = row.asset_group_listing_group_filter.case_value.product_custom_attribute
         results.append({
             "campaign": row.campaign.name,
             "asset_group": row.asset_group.name,
+            "included": node_type == "UNIT_INCLUDED",
             "custom_label_index": attr.index.name if attr.index else None,
             "custom_label_value": attr.value or None,
         })
