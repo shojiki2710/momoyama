@@ -28,6 +28,29 @@ def main():
     for row in filter_rows[:15]:
         print(" ", row)
 
+    print("\n=== DEBUG: raw asset_group_listing_group_filter rows (unfiltered) ===")
+    raw_query = """
+        SELECT
+          campaign.name,
+          asset_group.name,
+          asset_group_listing_group_filter.type,
+          asset_group_listing_group_filter.case_value.product_custom_attribute.index,
+          asset_group_listing_group_filter.case_value.product_custom_attribute.value
+        FROM asset_group_listing_group_filter
+        WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
+    """
+    raw_rows = ads_client._run_search(client, ADS_CUSTOMER_ID, raw_query)
+    print(f"{len(raw_rows)} raw rows")
+    for row in raw_rows[:20]:
+        f = row.asset_group_listing_group_filter
+        print(" ", {
+            "campaign": row.campaign.name,
+            "asset_group": row.asset_group.name,
+            "type": f.type.name,
+            "attr_index": f.case_value.product_custom_attribute.index.name,
+            "attr_value": f.case_value.product_custom_attribute.value,
+        })
+
     print("\n=== Google Ads: fetch_item_performance (last 3 days) ===")
     from datetime import date, timedelta
     date_to = date.today()
