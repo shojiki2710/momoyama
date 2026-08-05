@@ -18,6 +18,11 @@ jobs:
 
       - run: pip install -r requirements.txt -r scripts/direct_api/requirements-direct-api.txt
 
+      - name: Register GCP project with Merchant Center (one-time, safe to re-run)
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+        run: python scripts/direct_api/register_merchant_gcp.py
+
       - name: Run diagnostic script
         env:
           ADS_DEVELOPER_TOKEN: ${{ secrets.ADS_DEVELOPER_TOKEN }}
