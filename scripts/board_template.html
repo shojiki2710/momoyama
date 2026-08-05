@@ -67,6 +67,18 @@
     margin-bottom: 10px;
     line-height: 1.6;
   }
+  .audit-bar {
+    font-size: 12px;
+    font-weight: 700;
+    color: #7a5a12;
+    background: #fdf3e0;
+    border: 1px solid #f0d798;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    line-height: 1.6;
+  }
+  .audit-bar ul { margin: 4px 0 0; padding-left: 18px; font-weight: 500; }
   .period-bar {
     display: flex;
     justify-content: space-between;
@@ -257,6 +269,7 @@
   const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
+  const STRUCTURE_WARNINGS = __STRUCTURE_WARNINGS_JSON__; // account structure the pipeline doesn't recognize (new campaigns/AGs/labels)
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
@@ -355,6 +368,14 @@
       const staleDaysText = staleHours >= 48 ? `約${Math.floor(staleHours/24)}日間` : `${Math.floor(staleHours)}時間`;
       stale.innerHTML = `⚠️ このボードは${staleDaysText}更新されていません（最終更新：${GENERATED_AT}）。自動更新が失敗している可能性があります。GitHub Actionsの実行状況を確認してください。`;
       root.appendChild(stale);
+    }
+
+    if (STRUCTURE_WARNINGS.length > 0){
+      const escapeHtml = s => s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+      const audit = document.createElement("div");
+      audit.className = "audit-bar";
+      audit.innerHTML = `⚠️ このボードが認識していないアカウント構造が見つかりました。表示に反映されていない可能性があります：<ul>${STRUCTURE_WARNINGS.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`;
+      root.appendChild(audit);
     }
 
     const notice = document.createElement("div");

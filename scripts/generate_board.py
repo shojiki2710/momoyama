@@ -26,6 +26,17 @@ Real-data quirks confirmed against the live account that the source spec did not
   - asset_group_status stays ENABLED even when the parent campaign is paused (2026-08-03: the
     Gift-Scene campaign was paused on 2026-07-31, but its asset groups kept reporting
     asset_group_status=ENABLED) -- campaign_status must be checked too.
+  - A brand-new campaign can silently fall outside CAMPAIGN_KEYWORDS entirely (2026-08-05: the
+    "Second-Team" campaign, launched 2026-08-01, went unnoticed for days).
+
+Every one of the quirks above was found only because a human happened to notice the board didn't
+match reality and asked for it to be investigated -- the pipeline had no way to notice on its
+own. audit_structure() exists to close that gap: every run, it diffs what the account actually
+contains (campaigns / asset groups / product custom labels) against what this file knows how to
+handle (CAMPAIGN_KEYWORDS / AG_TO_LABELS / LABEL_TO_DISPLAY_AG), and surfaces anything unrecognized
+as a warning banner on the board itself plus a log line -- instead of the old behavior of quietly
+`continue`-ing past it. It doesn't auto-fix anything: deciding how a new campaign/AG/label should
+be categorized is a judgment call about the business, not something to infer from data.
 """
 import argparse
 import json
@@ -135,6 +146,7 @@ class FixtureClient:
     """
 
     _FILES = {
+        ("google_ads", ("campaign", "campaign_status")): "step0_all_campaigns.json",
         ("google_ads", ("campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id")): "step1_asset_groups.json",
         ("google_merchant", ("product_id", "product_custom_label_0", "product_title", "product_image_link")): "step2_merchant_products.json",
         ("google_ads", ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value")): "step3_item_performance_daily.json",
@@ -159,7 +171,10 @@ def fetch_ag_status(client, date_from, date_to):
 
     A name can legitimately appear more than once across different campaigns (confirmed
     2026-08-05: "ベストセラー" exists both as a paused leftover under Gift-Scene and as the real
-    active one under Best-Selling) -- treat as enabled if ANY matching row is enabled."""
+    active one under Best-Selling) -- treat as enabled if ANY matching row is enabled.
+
+    Also returns unrecognized_ags: asset groups seen inside in-scope campaigns that aren't in
+    AG_TO_LABELS or the Second-Team AG -- feeds the structure audit (see audit_structure)."""
     rows = client.get_data(
         "google_ads",
         ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
@@ -167,7 +182,9 @@ def fetch_ag_status(client, date_from, date_to):
         date_from=date_from,
         date_to=date_to,
     )
+    known_ag_names = set(AG_TO_LABELS) | {SECOND_TEAM_RAW_AG_NAME}
     status = {}
+    unrecognized_ags = []
     for row in rows:
         campaign = row.get("campaign") or ""
         if not any(k in campaign for k in CAMPAIGN_KEYWORDS):
@@ -177,7 +194,63 @@ def fetch_ag_status(client, date_from, date_to):
         ag_name = row.get("asset_group_name")
         enabled = campaign_status == "ENABLED" and ag_status == "ENABLED"
         status[ag_name] = status.get(ag_name, False) or enabled
-    return status
+        if ag_name not in known_ag_names:
+            unrecognized_ags.append({"campaign": campaign, "asset_group": ag_name, "status": ag_status})
+    return status, unrecognized_ags
+
+
+def fetch_all_campaigns(client, date_from, date_to):
+    """Every campaign in the account, no keyword filter -- feeds the structure audit below."""
+    rows = client.get_data(
+        "google_ads",
+        ["campaign", "campaign_status"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    seen = {}
+    for row in rows:
+        name = row.get("campaign")
+        if not name:
+            continue
+        seen[name] = (row.get("campaign_status") or "").upper()
+    return seen
+
+
+def audit_structure(all_campaigns, unrecognized_ags, product_labels):
+    """Surface anything the pipeline doesn't know how to categorize, instead of silently
+    dropping it. Added 2026-08-05 after three separate real incidents where new/changed account
+    structure (a paused parent campaign, a brand-new campaign, an AG spanning mixed labels) went
+    undetected until a human happened to notice the board didn't match reality. This can't
+    auto-fix anything -- the account structure is a judgment call only a human can make (see
+    AG_TO_LABELS/LABEL_TO_DISPLAY_AG/SECOND_TEAM_* above) -- it only makes gaps visible."""
+    warnings = []
+
+    for name, status in sorted(all_campaigns.items()):
+        if status == "REMOVED":
+            continue
+        if not any(k in name for k in CAMPAIGN_KEYWORDS):
+            warnings.append(f"未対応キャンペーン「{name}」(状態: {status}) はボードの対象外です。")
+
+    seen_ags = set()
+    for item in unrecognized_ags:
+        key = (item["campaign"], item["asset_group"])
+        if key in seen_ags:
+            continue
+        seen_ags.add(key)
+        warnings.append(
+            f"未対応アセットグループ「{item['asset_group']}」"
+            f"(キャンペーン「{item['campaign']}」、状態: {item['status']}) はラベル対応表にありません。"
+        )
+
+    seen_labels = set()
+    for info in product_labels.values():
+        label = info["label"]
+        if label and label not in LABEL_TO_DISPLAY_AG and label not in seen_labels:
+            seen_labels.add(label)
+            warnings.append(f"未対応カスタムラベル「{label}」が商品フィードに存在します。")
+
+    return warnings
 
 
 def fetch_product_labels(client, date_from, date_to):
@@ -292,7 +365,7 @@ def build_ag_status(raw_ag_status):
     return status
 
 
-def render_html(products, date_list, raw_ag_status, generated_at):
+def render_html(products, date_list, raw_ag_status, structure_warnings, generated_at):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     present_ags = {p["ag"] for p in products}
@@ -312,6 +385,7 @@ def render_html(products, date_list, raw_ag_status, generated_at):
     html = html.replace("__PRODUCTS_JSON__", js_json(products))
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
+    html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
     html = html.replace("__ROAS_MID__", str(ROAS_MID))
@@ -344,7 +418,8 @@ def main():
             sys.exit("WINDSOR_API_KEY is not set (expected as a GitHub Actions secret / env var).")
         client = WindsorClient(api_key)
 
-    raw_ag_status = fetch_ag_status(client, str(date_from), str(date_to))
+    raw_ag_status, unrecognized_ags = fetch_ag_status(client, str(date_from), str(date_to))
+    all_campaigns = fetch_all_campaigns(client, str(date_from), str(date_to))
     product_labels = fetch_product_labels(client, str(date_from), str(date_to))
     performance = fetch_item_performance(client, str(date_from), str(date_to))
     products = build_products(product_labels, performance, date_list)
@@ -355,8 +430,14 @@ def main():
             "empty page. Check WINDSOR_API_KEY / account IDs / AG_TO_LABELS mapping."
         )
 
+    structure_warnings = audit_structure(all_campaigns, unrecognized_ags, product_labels)
+    if structure_warnings:
+        print("WARNING: structure audit found account changes the pipeline doesn't recognize:")
+        for w in structure_warnings:
+            print(f"  - {w}")
+
     generated_at = now_jst.strftime("%Y-%m-%d %H:%M JST")
-    html = render_html(products, date_list, raw_ag_status, generated_at)
+    html = render_html(products, date_list, raw_ag_status, structure_warnings, generated_at)
 
     active_count = sum(1 for v in raw_ag_status.values() if v)
     args.out.parent.mkdir(parents=True, exist_ok=True)
