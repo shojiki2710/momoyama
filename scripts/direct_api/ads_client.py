@@ -84,6 +84,9 @@ def fetch_listing_group_filters(client, customer_id):
     product_custom_attribute set (case_value on a different oneof member, or unset) represents an
     "everything else" catch-all partition -- callers should treat that as "no specific label."
     """
+    # NOTE: asset_group_listing_group_filter.type is not filterable in WHERE (confirmed live
+    # 2026-08-05: GAQL rejects it with BAD_ENUM_CONSTANT even quoted correctly) -- filter for
+    # type == UNIT in Python instead, same defensive pattern used for the Windsor REST filters.
     query = """
         SELECT
           campaign.name,
@@ -94,11 +97,12 @@ def fetch_listing_group_filters(client, customer_id):
           asset_group_listing_group_filter.case_value.product_custom_attribute.value
         FROM asset_group_listing_group_filter
         WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
-          AND asset_group_listing_group_filter.type = 'UNIT'
     """
     rows = _run_search(client, customer_id, query)
     results = []
     for row in rows:
+        if row.asset_group_listing_group_filter.type.name != "UNIT":
+            continue
         attr = row.asset_group_listing_group_filter.case_value.product_custom_attribute
         results.append({
             "campaign": row.campaign.name,
