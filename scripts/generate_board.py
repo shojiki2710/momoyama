@@ -51,7 +51,18 @@ DEFAULT_PRESET_DAYS = 30  # initial selection shown on page load
 JST = ZoneInfo("Asia/Tokyo")
 
 # campaign name must contain at least one of these substrings to be in scope.
-CAMPAIGN_KEYWORDS = ("Gift", "Best")
+CAMPAIGN_KEYWORDS = ("Gift", "Best", "Second-Team")
+
+# Second-Team (found 2026-08-05: a new campaign since 2026-08-01, missed until then because its
+# name didn't match the old CAMPAIGN_KEYWORDS) doesn't target by custom_label_0 the way every
+# other campaign does -- its one asset group ("２軍") spans products with mixed/no labels
+# (confirmed: null, "Quick-Ship", "60th", "wedding" all present). So it can't be folded into the
+# label-based AG_TO_LABELS/LABEL_TO_DISPLAY_AG scheme below without silently merging its spend
+# into unrelated AGs' numbers for shared item_ids. It gets its own fixed bucket instead --
+# see fetch_item_performance/build_products.
+SECOND_TEAM_CAMPAIGN_KEYWORD = "Second-Team"
+SECOND_TEAM_RAW_AG_NAME = "２軍"
+SECOND_TEAM_DISPLAY_AG = "Second-Team(２軍)"
 
 # Google Ads asset_group_name -> Merchant Center custom_label_0 value(s) it corresponds to.
 # Verified against the live account on 2026-07-28. The Best-Selling campaign has a single AG
@@ -74,7 +85,7 @@ LABEL_TO_DISPLAY_AG = {
 }
 
 # preferred column order when the AG is active; unexpected/new active AGs are appended after.
-AG_DISPLAY_ORDER = ["還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く", "Best-Selling(似顔絵)", "Best-Selling(名入れ)"]
+AG_DISPLAY_ORDER = ["還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く", "Best-Selling(似顔絵)", "Best-Selling(名入れ)", SECOND_TEAM_DISPLAY_AG]
 
 ROAS_GOOD = 400
 ROAS_MID = 300
@@ -137,12 +148,18 @@ class FixtureClient:
         return json.loads((FIXTURES_DIR / filename).read_text(encoding="utf-8"))
 
 
-def fetch_active_labels(client, date_from, date_to):
-    """An asset group only actually serves when BOTH it and its parent campaign are enabled.
-    asset_group_status stays ENABLED even when the parent campaign is paused (confirmed live on
-    2026-08-02: the Gift-Scene campaign was paused on 2026-07-31, but every one of its asset
-    groups still reported asset_group_status=ENABLED) -- checking asset_group_status alone
-    silently over-counts AGs whose whole campaign has been paused."""
+def fetch_ag_status(client, date_from, date_to):
+    """raw asset_group_name -> True/False (currently enabled), requiring BOTH the AG itself and
+    its parent campaign to be enabled. asset_group_status alone stays ENABLED even when the
+    parent campaign is paused (confirmed live on 2026-08-02: the Gift-Scene campaign was paused
+    on 2026-07-31, but every one of its asset groups still reported asset_group_status=ENABLED).
+
+    Used only for the "現在稼働中/一時停止中" status badge per column -- not to decide which
+    columns can appear (see build_products).
+
+    A name can legitimately appear more than once across different campaigns (confirmed
+    2026-08-05: "ベストセラー" exists both as a paused leftover under Gift-Scene and as the real
+    active one under Best-Selling) -- treat as enabled if ANY matching row is enabled."""
     rows = client.get_data(
         "google_ads",
         ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
@@ -150,21 +167,17 @@ def fetch_active_labels(client, date_from, date_to):
         date_from=date_from,
         date_to=date_to,
     )
-    active_labels = set()
-    active_ag_names = set()
+    status = {}
     for row in rows:
         campaign = row.get("campaign") or ""
         if not any(k in campaign for k in CAMPAIGN_KEYWORDS):
             continue
         campaign_status = (row.get("campaign_status") or "").upper()
         ag_status = (row.get("asset_group_status") or "").upper()
-        if campaign_status != "ENABLED" or ag_status != "ENABLED":
-            continue
         ag_name = row.get("asset_group_name")
-        active_ag_names.add(ag_name)
-        for label in AG_TO_LABELS.get(ag_name, []):
-            active_labels.add(label)
-    return active_labels, active_ag_names
+        enabled = campaign_status == "ENABLED" and ag_status == "ENABLED"
+        status[ag_name] = status.get(ag_name, False) or enabled
+    return status
 
 
 def fetch_product_labels(client, date_from, date_to):
@@ -189,7 +202,13 @@ def fetch_product_labels(client, date_from, date_to):
 
 
 def fetch_item_performance(client, date_from, date_to):
-    """Returns {item_id: {"by_date": {date_str: {cost, conversions, value}}}}, daily granularity."""
+    """Returns {(bucket, item_id): {date_str: {cost, conversions, value}}}, daily granularity.
+
+    bucket is "second_team" for the Second-Team campaign, "labeled" for everything else (Gift-
+    Scene/Best-Selling). Keeping them apart -- rather than merging straight into a single
+    item_id-keyed dict -- matters because the same item_id can run under both simultaneously
+    (confirmed 2026-08-05): merging would silently mix Second-Team's spend into whichever AG the
+    item's custom_label_0 happens to map to."""
     rows = client.get_data(
         "google_ads",
         ["date", "campaign", "product_item_id", "cost", "conversions", "conversions_value"],
@@ -202,9 +221,15 @@ def fetch_item_performance(client, date_from, date_to):
         campaign = row.get("campaign") or ""
         item_id = row.get("product_item_id")
         date = row.get("date")
-        if not item_id or not date or not any(k in campaign for k in CAMPAIGN_KEYWORDS):
+        if not item_id or not date:
             continue
-        key = item_id.lower()
+        if SECOND_TEAM_CAMPAIGN_KEYWORD in campaign:
+            bucket = "second_team"
+        elif any(k in campaign for k in ("Gift", "Best")):
+            bucket = "labeled"
+        else:
+            continue
+        key = (bucket, item_id.lower())
         by_date = per_item.setdefault(key, {})
         day = by_date.setdefault(date, {"cost": 0.0, "conversions": 0.0, "value": 0.0})
         day["cost"] += float(row.get("cost") or 0)
@@ -224,9 +249,15 @@ def build_products(product_labels, performance, date_list):
     given viewer-selected date range is instead decided client-side, per range, based on whether
     that AG actually had spend in it -- see board_template.html."""
     products = []
-    for item_id, by_date in performance.items():
+    for (bucket, item_id), by_date in performance.items():
         info = product_labels.get(item_id)
-        if not info or info["label"] not in LABEL_TO_DISPLAY_AG:
+        if not info:
+            continue
+        if bucket == "second_team":
+            display_ag = SECOND_TEAM_DISPLAY_AG
+        elif info["label"] in LABEL_TO_DISPLAY_AG:
+            display_ag = LABEL_TO_DISPLAY_AG[info["label"]]
+        else:
             continue
         total_cost = sum(d["cost"] for d in by_date.values())
         if total_cost <= 0:
@@ -238,7 +269,7 @@ def build_products(product_labels, performance, date_list):
             cv_arr.append(round(day["conversions"], 4) if day else 0)
             value_arr.append(round(day["value"], 2) if day else 0)
         products.append({
-            "ag": LABEL_TO_DISPLAY_AG[info["label"]],
+            "ag": display_ag,
             "title": info["title"] or item_id,
             "id": item_id,
             "img": info["image"],
@@ -249,24 +280,25 @@ def build_products(product_labels, performance, date_list):
     return products
 
 
-def build_ag_status(active_ag_names):
+def build_ag_status(raw_ag_status):
     """Display-AG-name -> "ENABLED"/"PAUSED", reflecting the account's CURRENT state (used only
     for a status badge on each column -- no longer used to decide which columns can appear)."""
     status = {}
     for raw_ag_name, labels in AG_TO_LABELS.items():
-        current = "ENABLED" if raw_ag_name in active_ag_names else "PAUSED"
+        current = "ENABLED" if raw_ag_status.get(raw_ag_name) else "PAUSED"
         for label in labels:
             status[LABEL_TO_DISPLAY_AG[label]] = current
+    status[SECOND_TEAM_DISPLAY_AG] = "ENABLED" if raw_ag_status.get(SECOND_TEAM_RAW_AG_NAME) else "PAUSED"
     return status
 
 
-def render_html(products, date_list, active_ag_names, generated_at):
+def render_html(products, date_list, raw_ag_status, generated_at):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     present_ags = {p["ag"] for p in products}
     ag_order = [ag for ag in AG_DISPLAY_ORDER if ag in present_ags]
     ag_order += sorted(present_ags - set(ag_order))
-    ag_status = build_ag_status(active_ag_names)
+    ag_status = build_ag_status(raw_ag_status)
 
     def js_string_escape(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -312,7 +344,7 @@ def main():
             sys.exit("WINDSOR_API_KEY is not set (expected as a GitHub Actions secret / env var).")
         client = WindsorClient(api_key)
 
-    _active_labels, active_ag_names = fetch_active_labels(client, str(date_from), str(date_to))
+    raw_ag_status = fetch_ag_status(client, str(date_from), str(date_to))
     product_labels = fetch_product_labels(client, str(date_from), str(date_to))
     performance = fetch_item_performance(client, str(date_from), str(date_to))
     products = build_products(product_labels, performance, date_list)
@@ -324,11 +356,12 @@ def main():
         )
 
     generated_at = now_jst.strftime("%Y-%m-%d %H:%M JST")
-    html = render_html(products, date_list, active_ag_names, generated_at)
+    html = render_html(products, date_list, raw_ag_status, generated_at)
 
+    active_count = sum(1 for v in raw_ag_status.values() if v)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(html, encoding="utf-8")
-    print(f"Wrote {args.out} ({len(products)} products, {len(active_ag_names)} active AGs, {HISTORY_DAYS}d history).")
+    print(f"Wrote {args.out} ({len(products)} products, {active_count} active AGs, {HISTORY_DAYS}d history).")
 
 
 if __name__ == "__main__":
