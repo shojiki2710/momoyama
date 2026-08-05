@@ -1,0 +1,7 @@
+# Extra dependencies for the direct Google Ads / Merchant API / GA4 pipeline (scripts/direct_api/).
+# Kept separate from the top-level requirements.txt so the existing Windsor.ai pipeline
+# (scripts/generate_board.py) keeps working untouched while this is being built/tested.
+google-ads>=26.0.0
+google-shopping-merchant-products>=0.1.0
+google-analytics-data>=0.18.0
+google-auth>=2.15.0
