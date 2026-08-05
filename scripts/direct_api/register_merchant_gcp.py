@@ -3,6 +3,10 @@
 Required before any other Merchant API call works (confirmed live 2026-08-05: calls fail with
 401 GCP_NOT_REGISTERED until this has been done once). Safe to run more than once.
 """
+import sys
+
+sys.path.insert(0, ".")
+
 from google.shopping import merchant_accounts_v1
 
 from scripts.direct_api import merchant_client
