@@ -25,7 +25,10 @@ def main():
     print("\n=== Google Ads: fetch_listing_group_filters ===")
     filter_rows = ads_client.fetch_listing_group_filters(client, ADS_CUSTOMER_ID)
     print(f"{len(filter_rows)} rows")
-    for row in filter_rows[:15]:
+    tracked_campaigns = ("2024.3.1 P-MAX Gift-Scene", "2026.4.28 P-MAX Best-Selling", "2026.8.1 P-MAX Second-Team")
+    current_rows = [r for r in filter_rows if r["campaign"] in tracked_campaigns]
+    print(f"{len(current_rows)} rows in currently-tracked campaigns:")
+    for row in current_rows:
         print(" ", row)
 
     print("\n=== DEBUG: raw asset_group_listing_group_filter rows (unfiltered) ===")
