@@ -7,6 +7,7 @@ import sys
 
 sys.path.insert(0, ".")
 
+from google.api_core.exceptions import AlreadyExists
 from google.shopping import merchant_accounts_v1
 
 from scripts.direct_api import merchant_client
@@ -22,8 +23,13 @@ def main():
         name=f"accounts/{MERCHANT_ACCOUNT_ID}/developerRegistration",
         developer_email=DEVELOPER_EMAIL,
     )
-    response = client.register_gcp(request=request)
-    print("Registered:", response)
+    try:
+        response = client.register_gcp(request=request)
+        print("Registered:", response)
+    except AlreadyExists:
+        # confirmed live 2026-08-05: re-registering an already-registered GCP project raises
+        # ALREADY_EXISTS rather than being a no-op -- treat that as success, not a failure.
+        print("Already registered, nothing to do.")
 
 
 if __name__ == "__main__":
