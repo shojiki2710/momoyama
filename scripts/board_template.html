@@ -78,7 +78,16 @@
     margin-bottom: 10px;
     line-height: 1.6;
   }
-  .audit-bar ul { margin: 4px 0 0; padding-left: 18px; font-weight: 500; }
+  .audit-bar ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    font-weight: 500;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .audit-bar ul::-webkit-scrollbar { width: 6px; }
+  .audit-bar ul::-webkit-scrollbar-thumb { background: rgba(122,90,18,0.3); border-radius: 3px; }
+  .audit-bar ul::-webkit-scrollbar-track { background: transparent; }
   .period-bar {
     display: flex;
     justify-content: space-between;

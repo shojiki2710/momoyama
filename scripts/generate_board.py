@@ -231,7 +231,9 @@ def fetch_ag_status(client, date_from, date_to):
         enabled = campaign_status == "ENABLED" and ag_status == "ENABLED"
         status[ag_name] = status.get(ag_name, False) or enabled
         if ag_name not in known_ag_names:
-            unrecognized_ags.append({"campaign": campaign, "asset_group": ag_name, "status": ag_status})
+            unrecognized_ags.append({
+                "campaign": campaign, "asset_group": ag_name, "status": ag_status, "enabled": enabled,
+            })
     return status, unrecognized_ags
 
 
@@ -253,23 +255,34 @@ def fetch_all_campaigns(client, date_from, date_to):
     return seen
 
 
-def audit_structure(all_campaigns, unrecognized_ags, product_labels):
-    """Surface anything the pipeline doesn't know how to categorize, instead of silently
-    dropping it. Added 2026-08-05 after three separate real incidents where new/changed account
-    structure (a paused parent campaign, a brand-new campaign, an AG spanning mixed labels) went
-    undetected until a human happened to notice the board didn't match reality. This can't
-    auto-fix anything -- the account structure is a judgment call only a human can make (see
-    AG_TO_LABELS/LABEL_TO_DISPLAY_AG/SECOND_TEAM_* above) -- it only makes gaps visible."""
+def audit_structure(all_campaigns, unrecognized_ags, product_labels, performance):
+    """Surface anything the pipeline doesn't know how to categorize AND that's actually live right
+    now, instead of silently dropping it. Added 2026-08-05 after three separate real incidents
+    where new/changed account structure (a paused parent campaign, a brand-new campaign, an AG
+    spanning mixed labels) went undetected until a human happened to notice the board didn't match
+    reality. This can't auto-fix anything -- the account structure is a judgment call only a human
+    can make (see AG_TO_LABELS/LABEL_TO_DISPLAY_AG/SECOND_TEAM_* above) -- it only makes gaps
+    visible.
+
+    Deliberately restricted to things that could be silently costing money or converting right now
+    without showing up anywhere on the board: an ENABLED campaign/AG the pipeline doesn't route
+    anywhere, or a custom label with real recent spend that isn't mapped. A PAUSED/REMOVED campaign
+    or AG isn't spending, so nothing about it is missing from the board's current numbers -- and if
+    it gets re-enabled later, this audit catches it on the very next run. Narrowed 2026-08-07 after
+    the warning list grew to 20+ lines of long-dormant account debris, mostly obscuring the couple
+    of warnings that actually mattered."""
     warnings = []
 
     for name, status in sorted(all_campaigns.items()):
-        if status == "REMOVED":
+        if status != "ENABLED":
             continue
         if not any(k in name for k in CAMPAIGN_KEYWORDS):
             warnings.append(f"未対応キャンペーン「{name}」(状態: {status}) はボードの対象外です。")
 
     seen_ags = set()
     for item in unrecognized_ags:
+        if not item["enabled"]:
+            continue
         key = (item["campaign"], item["asset_group"])
         if key in seen_ags:
             continue
@@ -279,12 +292,19 @@ def audit_structure(all_campaigns, unrecognized_ags, product_labels):
             f"(キャンペーン「{item['campaign']}」、状態: {item['status']}) はラベル対応表にありません。"
         )
 
+    labels_with_spend = set()
+    for (_bucket, item_id), by_date in performance.items():
+        info = product_labels.get(item_id)
+        if not info or not info["label"]:
+            continue
+        if sum(d["cost"] for d in by_date.values()) > 0:
+            labels_with_spend.add(info["label"])
+
     seen_labels = set()
-    for info in product_labels.values():
-        label = info["label"]
-        if label and label not in LABEL_TO_DISPLAY_AG and label not in seen_labels:
+    for label in sorted(labels_with_spend):
+        if label not in LABEL_TO_DISPLAY_AG and label not in seen_labels:
             seen_labels.add(label)
-            warnings.append(f"未対応カスタムラベル「{label}」が商品フィードに存在します。")
+            warnings.append(f"未対応カスタムラベル「{label}」の商品に広告費用が発生しています。")
 
     return warnings
 
@@ -471,7 +491,7 @@ def main():
             "AG_TO_LABELS mapping."
         )
 
-    structure_warnings = audit_structure(all_campaigns, unrecognized_ags, product_labels)
+    structure_warnings = audit_structure(all_campaigns, unrecognized_ags, product_labels, performance)
     if structure_warnings:
         print("WARNING: structure audit found account changes the pipeline doesn't recognize:")
         for w in structure_warnings:
