@@ -1,1 +1,5 @@
-requests>=2.31
+google-ads>=26.0.0
+google-shopping-merchant-products>=0.1.0
+google-shopping-merchant-accounts>=0.1.0
+google-analytics-data>=0.18.0
+google-auth>=2.15.0

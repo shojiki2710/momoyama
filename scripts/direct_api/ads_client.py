@@ -1,9 +1,7 @@
 """Google Ads API access for the direct-API pipeline (replaces Windsor.ai's google_ads connector).
 
-NOT YET LIVE-TESTED -- written from Google's official documentation (developers.google.com/google-ads/api)
-since this environment has no Google Ads API credentials to verify against directly, unlike the
-Windsor.ai MCP connector used to validate the original pipeline. Treat field paths here as a strong
-first draft; confirm against a real run (see scripts/direct_api/test_ads_client.py) before relying on it.
+Live-verified against the real account on 2026-08-05 via scripts/direct_api/test_direct_api.py
+(run through GitHub Actions, since this environment has no local Google Ads API credentials).
 
 Two things Windsor abstracted away that this file has to do explicitly:
   - cost is returned as cost_micros (int, 1/1,000,000 of the currency unit) -- must divide by 1e6.
@@ -72,6 +70,14 @@ def fetch_ag_status(client, customer_id):
         }
         for row in rows
     ]
+
+
+def fetch_all_campaigns(client, customer_id):
+    """Every campaign in the account, no filter -- feeds generate_board.py's structure audit
+    (catching e.g. a brand-new campaign that doesn't match CAMPAIGN_KEYWORDS)."""
+    query = "SELECT campaign.name, campaign.status FROM campaign"
+    rows = _run_search(client, customer_id, query)
+    return [{"campaign": row.campaign.name, "campaign_status": row.campaign.status.name} for row in rows]
 
 
 def fetch_listing_group_filters(client, customer_id):

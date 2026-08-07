@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Fetch AG x product performance from Windsor.ai and render the listing group board.
+"""Fetch AG x product performance directly from Google Ads API / Merchant API and render the
+listing group board.
+
+Switched from Windsor.ai to direct API access on 2026-08-05 (see scripts/direct_api/) -- driven by
+wanting to drop the Windsor subscription and to read listing-group-filter configuration Windsor
+could not expose. DirectApiClient below adapts the direct API clients to the exact same
+.get_data(connector, fields, accounts, date_from, date_to) shape WindsorClient used to have, so
+everything below this point (fetch_ag_status, fetch_item_performance, build_products, etc.) is
+unchanged from the Windsor-era version and the local --fixtures dev fixtures still apply as-is.
 
 Pipeline (see the Notion spec "仕様書：リスティンググループ商品ボード自動更新" for background):
   1. google_ads:      campaign, campaign_status, asset_group_name, asset_group_status, asset_group_id
@@ -46,16 +54,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import requests
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 TEMPLATE_PATH = SCRIPT_DIR / "board_template.html"
 OUTPUT_PATH = REPO_ROOT / "docs" / "index.html"
 FIXTURES_DIR = SCRIPT_DIR / "dev_fixtures"
 
-WINDSOR_BASE_URL = "https://connectors.windsor.ai"
-GOOGLE_ADS_ACCOUNT = "795-169-0216"
+GOOGLE_ADS_ACCOUNT = "795-169-0216"  # DirectApiClient strips dashes before calling the Ads API
 MERCHANT_ACCOUNT = "273780463"
 HISTORY_DAYS = 90  # rolling window baked into the page; bounds the custom date-range picker
 DEFAULT_PRESET_DAYS = 30  # initial selection shown on page load
@@ -108,41 +113,72 @@ def normalize_label(label):
     return label.strip().lower()
 
 
-class WindsorClient:
-    """Thin wrapper around the Windsor.ai REST connectors API.
+class DirectApiClient:
+    """Adapts scripts/direct_api/{ads_client,merchant_client}.py to the exact same
+    .get_data(connector, fields, accounts, date_from, date_to) shape the old WindsorClient had,
+    so every fetch_* function below is unchanged from the Windsor-era version -- only this class
+    and FixtureClient's underlying JSON needed to line up with reality (and the fixtures already
+    used these same field names, so they needed no changes either).
 
-    NOTE: filtering (campaign contains "Gift"/"Best", asset_group_status == ENABLED, null
-    item_id) is deliberately done in Python after fetching, not via REST query filters. The
-    exact REST filter query-param syntax could not be live-tested from the environment this
-    script was authored in (only the separate Windsor.ai MCP connector was available, which
-    abstracts the raw REST call away). Fetching broad and filtering client-side sidesteps that
-    unknown and mirrors what the source spec already recommends for the merchant step.
+    The import is lazy (inside __init__, not at module level) so `--fixtures` runs don't require
+    the google-ads / google-shopping-merchant-products packages to be installed at all.
     """
 
-    def __init__(self, api_key):
-        self.api_key = api_key
+    def __init__(self):
+        sys.path.insert(0, str(REPO_ROOT))
+        from scripts.direct_api import ads_client, merchant_client
+
+        self._ads = ads_client
+        self._merchant = merchant_client
+        self._ads_client = ads_client.build_client()
+        self._merchant_credentials = merchant_client.build_credentials()
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
-        params = {
-            "api_key": self.api_key,
-            "fields": ",".join(fields),
-            "accounts": ",".join(accounts) if isinstance(accounts, (list, tuple)) else accounts,
-            "date_from": date_from,
-            "date_to": date_to,
-        }
-        resp = requests.get(f"{WINDSOR_BASE_URL}/{connector}", params=params, timeout=120)
-        resp.raise_for_status()
-        payload = resp.json()
-        rows = payload.get("data") if isinstance(payload, dict) else payload
-        if not isinstance(rows, list):
-            raise RuntimeError(f"Unexpected Windsor.ai response shape for {connector}: {payload!r}")
-        return rows
+        fields = tuple(fields)
+        account = accounts[0] if isinstance(accounts, (list, tuple)) else accounts
+
+        if connector == "google_ads":
+            customer_id = account.replace("-", "")
+            if fields == ("campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"):
+                rows = self._ads.fetch_ag_status(self._ads_client, customer_id)
+                return [
+                    {
+                        "campaign": r["campaign"],
+                        "campaign_status": r["campaign_status"],
+                        "asset_group_name": r["asset_group"],
+                        "asset_group_status": r["asset_group_status"],
+                    }
+                    for r in rows
+                ]
+            if fields == ("campaign", "campaign_status"):
+                return self._ads.fetch_all_campaigns(self._ads_client, customer_id)
+            if fields == ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value"):
+                return self._ads.fetch_item_performance(self._ads_client, customer_id, date_from, date_to)
+
+        elif connector == "google_merchant":
+            if fields == ("product_id", "product_custom_label_0", "product_title", "product_image_link"):
+                products = self._merchant.fetch_products(self._merchant_credentials, account)
+                normalized = [self._merchant.normalize_product(p) for p in products]
+                return [
+                    {
+                        "product_id": n["product_id"],
+                        "product_custom_label_0": n["label"],
+                        "product_title": n["title"],
+                        "product_image_link": n["image"],
+                    }
+                    for n in normalized
+                ]
+
+        raise RuntimeError(f"DirectApiClient has no mapping for connector={connector!r} fields={fields!r}")
 
 
 class FixtureClient:
-    """Drop-in replacement for WindsorClient that reads scripts/dev_fixtures/*.json.
+    """Drop-in replacement for DirectApiClient that reads scripts/dev_fixtures/*.json.
 
-    Used for local development/testing without a live Windsor.ai REST API key -- see README.
+    Used for local development/testing without live Google Ads / Merchant API credentials --
+    see README. The fixture files were captured with Windsor-era field names, which is fine:
+    DirectApiClient reshapes its own responses into those exact same names, so nothing here needed
+    to change when the data source switched.
     """
 
     _FILES = {
@@ -397,7 +433,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--fixtures", action="store_true",
-        help="use local scripts/dev_fixtures/*.json instead of calling the live Windsor.ai REST API",
+        help="use local scripts/dev_fixtures/*.json instead of calling the live Google Ads / Merchant API",
     )
     parser.add_argument(
         "--out", type=Path, default=OUTPUT_PATH,
@@ -413,10 +449,14 @@ def main():
     if args.fixtures:
         client = FixtureClient()
     else:
-        api_key = os.environ.get("WINDSOR_API_KEY")
-        if not api_key:
-            sys.exit("WINDSOR_API_KEY is not set (expected as a GitHub Actions secret / env var).")
-        client = WindsorClient(api_key)
+        required_env = (
+            "ADS_DEVELOPER_TOKEN", "ADS_CLIENT_ID", "ADS_CLIENT_SECRET",
+            "ADS_REFRESH_TOKEN", "GCP_SERVICE_ACCOUNT_JSON",
+        )
+        missing = [v for v in required_env if not os.environ.get(v)]
+        if missing:
+            sys.exit(f"Missing required environment variable(s): {', '.join(missing)} (expected as GitHub Actions secrets).")
+        client = DirectApiClient()
 
     raw_ag_status, unrecognized_ags = fetch_ag_status(client, str(date_from), str(date_to))
     all_campaigns = fetch_all_campaigns(client, str(date_from), str(date_to))
@@ -427,7 +467,8 @@ def main():
     if not products:
         sys.exit(
             "No products resolved after joining -- refusing to overwrite the board with an "
-            "empty page. Check WINDSOR_API_KEY / account IDs / AG_TO_LABELS mapping."
+            "empty page. Check the ADS_*/GCP_SERVICE_ACCOUNT_JSON secrets, account IDs, and "
+            "AG_TO_LABELS mapping."
         )
 
     structure_warnings = audit_structure(all_campaigns, unrecognized_ags, product_labels)

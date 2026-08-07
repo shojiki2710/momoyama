@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -r requirements.txt -r scripts/direct_api/requirements-direct-api.txt
+      - run: pip install -r requirements.txt
 
       - name: Register GCP project with Merchant Center (one-time, safe to re-run)
         env:
