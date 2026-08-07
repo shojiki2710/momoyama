@@ -2,10 +2,14 @@ name: Update listing group board
 
 on:
   schedule:
-    # 22:07 UTC == 07:07 JST. Offset a few minutes past the hour on purpose --
-    # GitHub Actions explicitly documents top-of-the-hour schedules as more likely
-    # to be delayed or dropped under load (confirmed happened on 2026-07-29's 0-minute run).
-    - cron: "7 22 * * *"
+    # Compensating for an observed, remarkably consistent ~9h43m scheduling delay on this repo
+    # (measured across 6 scheduled runs 2026-07-30 through 2026-08-06: actual firing landed
+    # 9h30m-9h54m after the requested time, every single day -- not occasional flakiness, a
+    # steady offset). Requesting 12:24 UTC (21:24 JST) so the ~9h43m delay lands actual execution
+    # near 07:07 JST, the original target. Empirical workaround, not a real fix -- if GitHub's
+    # delay behavior changes, this offset will need re-tuning. Re-measure via the Actions run
+    # history (event=="schedule" runs) if the board stops updating near morning JST again.
+    - cron: "24 12 * * *"
   workflow_dispatch: {}
 
 permissions:
