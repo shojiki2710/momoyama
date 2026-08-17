@@ -299,7 +299,7 @@
   function hoursSinceGenerated(){
     const m = GENERATED_AT.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
     if (!m) return null;
-    const [, y, mo, d, h, mi] = m.slice(1).map(Number);
+    const [y, mo, d, h, mi] = m.slice(1).map(Number);
     // GENERATED_AT is rendered in JST (UTC+9); convert to a true UTC instant to compare against "now".
     const generatedUtcMs = Date.UTC(y, mo - 1, d, h, mi) - 9 * 60 * 60 * 1000;
     return (Date.now() - generatedUtcMs) / 3600000;
