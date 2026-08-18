@@ -103,6 +103,18 @@ LABEL_TO_DISPLAY_AG = {
 # preferred column order when the AG is active; unexpected/new active AGs are appended after.
 AG_DISPLAY_ORDER = ["還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く", "Best-Selling(似顔絵)", "Best-Selling(名入れ)", SECOND_TEAM_DISPLAY_AG]
 
+# raw AG name -> the campaign it lives under, for the campaign-level ROAS tier between the
+# account-wide total and the per-AG columns (added 2026-08-18). Second-Team gets its own fixed
+# entry below since (like its display-AG mapping) it isn't part of the label-based scheme.
+RAW_AG_TO_CAMPAIGN = {
+    "還暦祝い": "Gift-Scene",
+    "誕生日祝い": "Gift-Scene",
+    "結婚祝い": "Gift-Scene",
+    "すぐ届く": "Gift-Scene",
+    "ベストセラー": "Best-Selling",
+}
+CAMPAIGN_DISPLAY_ORDER = ["Best-Selling", "Second-Team", "Gift-Scene"]
+
 ROAS_GOOD = 400
 ROAS_MID = 300
 
@@ -421,6 +433,23 @@ def build_ag_status(raw_ag_status):
     return status
 
 
+def build_campaign_of_ag():
+    """Display-AG-name -> campaign name, for the client-side campaign-level ROAS tier.
+    Derived from RAW_AG_TO_CAMPAIGN/AG_TO_LABELS/LABEL_TO_DISPLAY_AG rather than hand-duplicating
+    the mapping, so it can't drift out of sync with those. A display AG with no known campaign
+    (e.g. a brand-new AG the structure audit hasn't been taught yet) is simply absent here --
+    the client groups those under a catch-all "その他" bucket rather than dropping them."""
+    campaign_of_ag = {}
+    for raw_ag_name, labels in AG_TO_LABELS.items():
+        campaign = RAW_AG_TO_CAMPAIGN.get(raw_ag_name)
+        if not campaign:
+            continue
+        for label in labels:
+            campaign_of_ag[LABEL_TO_DISPLAY_AG[label]] = campaign
+    campaign_of_ag[SECOND_TEAM_DISPLAY_AG] = "Second-Team"
+    return campaign_of_ag
+
+
 def render_html(products, date_list, raw_ag_status, structure_warnings, generated_at):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
@@ -428,6 +457,7 @@ def render_html(products, date_list, raw_ag_status, structure_warnings, generate
     ag_order = [ag for ag in AG_DISPLAY_ORDER if ag in present_ags]
     ag_order += sorted(present_ags - set(ag_order))
     ag_status = build_ag_status(raw_ag_status)
+    campaign_of_ag = build_campaign_of_ag()
 
     def js_string_escape(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -441,6 +471,8 @@ def render_html(products, date_list, raw_ag_status, structure_warnings, generate
     html = html.replace("__PRODUCTS_JSON__", js_json(products))
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
+    html = html.replace("__CAMPAIGN_OF_AG_JSON__", js_json(campaign_of_ag))
+    html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
     html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
