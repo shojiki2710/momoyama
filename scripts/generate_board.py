@@ -79,7 +79,7 @@ CAMPAIGN_KEYWORDS = ("Gift", "Best", "Second-Team")
 # see fetch_item_performance/build_products.
 SECOND_TEAM_CAMPAIGN_KEYWORD = "Second-Team"
 SECOND_TEAM_RAW_AG_NAME = "２軍"
-SECOND_TEAM_DISPLAY_AG = "Second-Team(２軍)"
+SECOND_TEAM_DISPLAY_AG = "２軍"  # matches the real Google Ads AG name exactly (2026-08-20, per ふなとさん)
 
 # Google Ads asset_group_name -> Merchant Center custom_label_0 value(s) it corresponds to.
 # Verified against the live account on 2026-07-28. The Best-Selling campaign has a single AG
@@ -101,8 +101,8 @@ LABEL_TO_DISPLAY_AG = {
     "birthday": "誕生日祝い",
     "wedding": "結婚祝い",
     "quick-ship": "すぐ届く",
-    "best_seller_nigaoe": "Best-Selling(似顔絵)",
-    "best_seller_signed": "Best-Selling(名入れ)",
+    "best_seller_nigaoe": "ベストセラー(似顔絵)",
+    "best_seller_signed": "ベストセラー(名入れ)",
     "best_seller_quickship": "即納・ベストセラー",
 }
 
@@ -115,7 +115,7 @@ KNOWN_UNMAPPED_LABELS = {"excluded", "single"}
 # preferred column order when the AG is active; unexpected/new active AGs are appended after.
 AG_DISPLAY_ORDER = [
     "還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く",
-    "Best-Selling(似顔絵)", "Best-Selling(名入れ)", "即納・ベストセラー",
+    "ベストセラー(似顔絵)", "ベストセラー(名入れ)", "即納・ベストセラー",
     SECOND_TEAM_DISPLAY_AG,
 ]
 
