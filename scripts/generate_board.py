@@ -64,7 +64,7 @@ GOOGLE_ADS_ACCOUNT = "795-169-0216"  # DirectApiClient strips dashes before call
 MERCHANT_ACCOUNT = "273780463"
 SHOPIFY_SHOP_DOMAIN = "momoyama7245.myshopify.com"
 HISTORY_DAYS = 90  # rolling window baked into the page; bounds the custom date-range picker
-DEFAULT_PRESET_DAYS = 30  # initial selection shown on page load
+DEFAULT_PRESET_DAYS = 7  # initial selection shown on page load
 JST = ZoneInfo("Asia/Tokyo")
 
 # campaign name must contain at least one of these substrings to be in scope.
