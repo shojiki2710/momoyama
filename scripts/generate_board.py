@@ -166,6 +166,8 @@ class DirectApiClient:
                 return self._ads.fetch_all_campaigns(self._ads_client, customer_id)
             if fields == ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value"):
                 return self._ads.fetch_item_performance(self._ads_client, customer_id, date_from, date_to)
+            if fields == ("date", "cost", "conversions_value"):
+                return self._ads.fetch_account_daily_totals(self._ads_client, customer_id, date_from, date_to)
 
         elif connector == "google_merchant":
             if fields == ("product_id", "product_custom_label_0", "product_title", "product_image_link"):
@@ -198,6 +200,7 @@ class FixtureClient:
         ("google_ads", ("campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id")): "step1_asset_groups.json",
         ("google_merchant", ("product_id", "product_custom_label_0", "product_title", "product_image_link")): "step2_merchant_products.json",
         ("google_ads", ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value")): "step3_item_performance_daily.json",
+        ("google_ads", ("date", "cost", "conversions_value")): "step4_account_daily_totals.json",
     }
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
@@ -379,6 +382,31 @@ def fetch_item_performance(client, date_from, date_to):
     return per_item
 
 
+def fetch_account_daily_totals(client, date_from, date_to):
+    """{date_str: {cost, value}}, TRUE account-wide totals (every campaign, not just ones the
+    board can classify by custom_label_0). Feeds the site-wide ROAS shown in the hero banner --
+    added 2026-08-20 after realizing that number was silently computed from classified spend only
+    (fetch_item_performance's join), understating true cost by whatever ran under an unmapped
+    label. See ads_client.fetch_account_daily_totals for why the `customer` resource is the right
+    source for this (independent of any product/AG join)."""
+    rows = client.get_data(
+        "google_ads",
+        ["date", "cost", "conversions_value"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    totals = {}
+    for row in rows:
+        date = row.get("date")
+        if not date:
+            continue
+        day = totals.setdefault(date, {"cost": 0.0, "value": 0.0})
+        day["cost"] += float(row.get("cost") or 0)
+        day["value"] += float(row.get("conversions_value") or 0)
+    return totals
+
+
 def build_products(product_labels, performance, date_list):
     """Each product carries cost/cv/value as arrays aligned index-for-index with date_list, so
     the page can sum any contiguous slice client-side without refetching anything.
@@ -450,7 +478,10 @@ def build_campaign_of_ag():
     return campaign_of_ag
 
 
-def render_html(products, date_list, raw_ag_status, structure_warnings, generated_at):
+def render_html(
+    products, date_list, raw_ag_status, structure_warnings, generated_at,
+    account_cost, account_value,
+):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     present_ags = {p["ag"] for p in products}
@@ -473,6 +504,8 @@ def render_html(products, date_list, raw_ag_status, structure_warnings, generate
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
     html = html.replace("__CAMPAIGN_OF_AG_JSON__", js_json(campaign_of_ag))
     html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
+    html = html.replace("__ACCOUNT_COST_JSON__", js_json(account_cost))
+    html = html.replace("__ACCOUNT_VALUE_JSON__", js_json(account_value))
     html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
@@ -515,6 +548,9 @@ def main():
     product_labels = fetch_product_labels(client, str(date_from), str(date_to))
     performance = fetch_item_performance(client, str(date_from), str(date_to))
     products = build_products(product_labels, performance, date_list)
+    account_daily_totals = fetch_account_daily_totals(client, str(date_from), str(date_to))
+    account_cost = [round(account_daily_totals.get(d, {}).get("cost", 0), 2) for d in date_list]
+    account_value = [round(account_daily_totals.get(d, {}).get("value", 0), 2) for d in date_list]
 
     if not products:
         sys.exit(
@@ -530,7 +566,10 @@ def main():
             print(f"  - {w}")
 
     generated_at = now_jst.strftime("%Y-%m-%d %H:%M JST")
-    html = render_html(products, date_list, raw_ag_status, structure_warnings, generated_at)
+    html = render_html(
+        products, date_list, raw_ag_status, structure_warnings, generated_at,
+        account_cost, account_value,
+    )
 
     active_count = sum(1 for v in raw_ag_status.values() if v)
     args.out.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,72 @@
+[
+  {
+    "date": "2026-07-22",
+    "cost": 22292.78,
+    "conversions_value": 63144.61
+  },
+  {
+    "date": "2026-07-23",
+    "cost": 18303.26,
+    "conversions_value": 56560.26
+  },
+  {
+    "date": "2026-07-24",
+    "cost": 21177.12,
+    "conversions_value": 77925.65
+  },
+  {
+    "date": "2026-07-25",
+    "cost": 20101.02,
+    "conversions_value": 58554.68
+  },
+  {
+    "date": "2026-07-26",
+    "cost": 31430.83,
+    "conversions_value": 89223.84
+  },
+  {
+    "date": "2026-07-27",
+    "cost": 23624.91,
+    "conversions_value": 81670.41
+  },
+  {
+    "date": "2026-07-28",
+    "cost": 24482.83,
+    "conversions_value": 74880.46
+  },
+  {
+    "date": "2026-07-29",
+    "cost": 20675.61,
+    "conversions_value": 72538.8
+  },
+  {
+    "date": "2026-07-30",
+    "cost": 23801.4,
+    "conversions_value": 84876.87
+  },
+  {
+    "date": "2026-07-31",
+    "cost": 25040.18,
+    "conversions_value": 70324.05
+  },
+  {
+    "date": "2026-08-01",
+    "cost": 17442.69,
+    "conversions_value": 64670.19
+  },
+  {
+    "date": "2026-08-02",
+    "cost": 19664.94,
+    "conversions_value": 59036.58
+  },
+  {
+    "date": "2026-08-03",
+    "cost": 19685.29,
+    "conversions_value": 63732.56
+  },
+  {
+    "date": "2026-08-04",
+    "cost": 36675.85,
+    "conversions_value": 107303.68
+  }
+]

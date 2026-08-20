@@ -125,6 +125,34 @@ def fetch_listing_group_filters(client, customer_id):
     return results
 
 
+def fetch_account_daily_totals(client, customer_id, date_from, date_to):
+    """TRUE account-wide daily cost/conversions_value -- every campaign, regardless of
+    CAMPAIGN_KEYWORDS or custom_label_0 classification. Added 2026-08-20 because the board's
+    "全体ROAS" was silently computed only from item_id-classified spend (fetch_item_performance,
+    joined against a recognized custom_label_0), which understates true ad cost by however much
+    is running under an unmapped label (best_seller_quickship/excluded/single, etc. -- see the
+    board's own structure-audit warnings). The `customer` resource aggregates at the account
+    level per day, independent of any campaign/AG/product join, so this is the one honest source
+    for "how much did advertising actually cost, and what did it actually return"."""
+    query = f"""
+        SELECT
+          segments.date,
+          metrics.cost_micros,
+          metrics.conversions_value
+        FROM customer
+        WHERE segments.date BETWEEN '{date_from}' AND '{date_to}'
+    """
+    rows = _run_search(client, customer_id, query)
+    return [
+        {
+            "date": row.segments.date,
+            "cost": row.metrics.cost_micros / 1_000_000,
+            "conversions_value": row.metrics.conversions_value,
+        }
+        for row in rows
+    ]
+
+
 def fetch_item_performance(client, customer_id, date_from, date_to):
     """Daily per-product performance across all campaigns -- Windsor's item_id-level step.
     Cost comes back as cost_micros; divide by 1_000_000 here so callers get real currency units."""

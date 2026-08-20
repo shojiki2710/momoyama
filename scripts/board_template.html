@@ -312,6 +312,8 @@
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
   const CAMPAIGN_OF_AG = __CAMPAIGN_OF_AG_JSON__; // display AG name -> campaign name (missing = "その他" bucket)
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
+  const ACCOUNT_COST = __ACCOUNT_COST_JSON__;   // true account-wide daily ad cost, aligned to DATES (every campaign, not just classified spend)
+  const ACCOUNT_VALUE = __ACCOUNT_VALUE_JSON__; // true account-wide daily conversion value, aligned to DATES
   const STRUCTURE_WARNINGS = __STRUCTURE_WARNINGS_JSON__; // account structure the pipeline doesn't recognize (new campaigns/AGs/labels)
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
@@ -363,8 +365,15 @@
     const endDate = DATES[rangeEnd];
     const stats = products.map(p => ({ p, agg: aggregate(p, rangeStart, rangeEnd) }));
 
-    const totalCost = stats.reduce((s,x)=>s+x.agg.cost,0);
-    const totalValue = stats.reduce((s,x)=>s+x.agg.value,0);
+    // TRUE account-wide totals (ACCOUNT_COST/ACCOUNT_VALUE), not the sum of `stats` -- `stats`
+    // only covers item_ids the pipeline could classify into a recognized AG/label, which
+    // understates true spend by whatever runs under an unmapped label (see the audit-bar
+    // warnings for which labels those are right now).
+    let totalCost = 0, totalValue = 0;
+    for (let i = rangeStart; i <= rangeEnd; i++){
+      totalCost += ACCOUNT_COST[i] || 0;
+      totalValue += ACCOUNT_VALUE[i] || 0;
+    }
     const overallRoas = totalCost > 0 ? (totalValue/totalCost*100) : null;
     const overallRoasText = overallRoas === null ? "—" : overallRoas.toFixed(1);
     const belowTarget = overallRoas === null || overallRoas < ROAS_GOOD;
@@ -420,22 +429,6 @@
       </div>
     `;
     root.appendChild(hero);
-
-    if (shownCampaignGroups.length > 0){
-      const campaignBar = document.createElement("div");
-      campaignBar.className = "campaign-bar";
-      campaignBar.innerHTML = shownCampaignGroups.map(g => `
-        <div class="campaign-card ${grade(g.roas)}">
-          <div class="campaign-name">${g.campaign}</div>
-          <div class="campaign-metrics">
-            <span class="roas-badge small ${grade(g.roas)}">${pct(g.roas)}</span>
-            <span>費用 ${yen(g.cost)}</span>
-            <span>CV ${g.cv.toFixed(1)}</span>
-          </div>
-        </div>
-      `).join("");
-      root.appendChild(campaignBar);
-    }
 
     const staleHours = hoursSinceGenerated();
     if (staleHours !== null && staleHours >= STALE_THRESHOLD_HOURS){
@@ -509,6 +502,22 @@
       <span><span class="legend-dot" style="background:#adaba3;"></span>期間内データなし</span>
     `;
     root.appendChild(legend);
+
+    if (shownCampaignGroups.length > 0){
+      const campaignBar = document.createElement("div");
+      campaignBar.className = "campaign-bar";
+      campaignBar.innerHTML = shownCampaignGroups.map(g => `
+        <div class="campaign-card ${grade(g.roas)}">
+          <div class="campaign-name">${g.campaign}</div>
+          <div class="campaign-metrics">
+            <span class="roas-badge small ${grade(g.roas)}">${pct(g.roas)}</span>
+            <span>費用 ${yen(g.cost)}</span>
+            <span>CV ${g.cv.toFixed(1)}</span>
+          </div>
+        </div>
+      `).join("");
+      root.appendChild(campaignBar);
+    }
 
     const grid = document.createElement("div");
     grid.className = "board-grid";
