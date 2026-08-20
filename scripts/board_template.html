@@ -602,7 +602,7 @@
 
     const foot = document.createElement("div");
     foot.className = "footnote";
-    foot.innerHTML = `データソース：Windsor.ai経由（google_ads: asset_group_status／google_merchant: product_custom_label_0／google_ads: item_id別・日別実績、直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
+    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
     root.appendChild(foot);
   }
 
