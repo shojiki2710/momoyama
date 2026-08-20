@@ -146,7 +146,7 @@ class DirectApiClient:
         self._shopify = shopify_client
         self._ads_client = ads_client.build_client()
         self._merchant_credentials = merchant_client.build_credentials()
-        self._shopify_token = shopify_client.build_credentials()
+        self._shopify_token = shopify_client.build_credentials(SHOPIFY_SHOP_DOMAIN)
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
         fields = tuple(fields)
@@ -567,7 +567,7 @@ def main():
     else:
         required_env = (
             "ADS_DEVELOPER_TOKEN", "ADS_CLIENT_ID", "ADS_CLIENT_SECRET",
-            "ADS_REFRESH_TOKEN", "GCP_SERVICE_ACCOUNT_JSON", "SHOPIFY_ACCESS_TOKEN",
+            "ADS_REFRESH_TOKEN", "GCP_SERVICE_ACCOUNT_JSON", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET",
         )
         missing = [v for v in required_env if not os.environ.get(v)]
         if missing:
