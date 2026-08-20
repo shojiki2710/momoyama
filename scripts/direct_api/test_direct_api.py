@@ -1,74 +1,58 @@
 #!/usr/bin/env python3
-"""Diagnostic script: exercises the direct Google Ads / Merchant API clients against real
-credentials and prints samples + counts, for validating scripts/direct_api/*.py against reality
-before generate_board.py is ever switched over to use them. Does not write anything anywhere --
-read-only. Meant to be run manually via GitHub Actions (see .github/workflows/test-direct-api.yml),
-since this environment has no local credentials to test against.
+"""Diagnostic script: dumps the FULL real listing-group-filter configuration for every
+PERFORMANCE_MAX campaign/asset group in the account, to evaluate automating generate_board.py's
+hand-maintained AG_TO_LABELS/LABEL_TO_DISPLAY_AG tables from Google Ads' own config instead
+(2026-08-20 investigation). Read-only. Meant to be run manually via GitHub Actions (see
+.github/workflows/test-direct-api.yml), since this environment has no local credentials to test
+against.
 """
 import sys
+from collections import defaultdict
 
 sys.path.insert(0, ".")
-from scripts.direct_api import ads_client, merchant_client
+from scripts.direct_api import ads_client
 
 ADS_CUSTOMER_ID = "7951690216"  # 795-169-0216, no dashes
-MERCHANT_ACCOUNT_ID = "273780463"
 
 
 def main():
-    print("=== Google Ads: fetch_ag_status ===")
     client = ads_client.build_client()
+
+    print("=== All campaigns (name, status) ===")
+    campaigns = ads_client.fetch_all_campaigns(client, ADS_CUSTOMER_ID)
+    for c in campaigns:
+        print(" ", c)
+
+    print("\n=== fetch_ag_status: every AG's campaign + enabled state ===")
     ag_rows = ads_client.fetch_ag_status(client, ADS_CUSTOMER_ID)
-    print(f"{len(ag_rows)} rows")
-    for row in ag_rows[:10]:
+    for row in ag_rows:
         print(" ", row)
 
-    print("\n=== Google Ads: fetch_listing_group_filters ===")
+    print("\n=== fetch_listing_group_filters: FULL dump, grouped by (campaign, asset_group) ===")
     filter_rows = ads_client.fetch_listing_group_filters(client, ADS_CUSTOMER_ID)
-    print(f"{len(filter_rows)} rows")
-    tracked_campaigns = ("2024.3.1 P-MAX Gift-Scene", "2026.4.28 P-MAX Best-Selling", "2026.8.1 P-MAX Second-Team")
-    current_rows = [r for r in filter_rows if r["campaign"] in tracked_campaigns]
-    print(f"{len(current_rows)} rows in currently-tracked campaigns:")
-    for row in current_rows:
-        print(" ", row)
+    print(f"{len(filter_rows)} total UNIT_INCLUDED/UNIT_EXCLUDED rows\n")
 
-    print("\n=== DEBUG: raw asset_group_listing_group_filter rows (unfiltered) ===")
-    raw_query = """
-        SELECT
-          campaign.name,
-          asset_group.name,
-          asset_group_listing_group_filter.type,
-          asset_group_listing_group_filter.case_value.product_custom_attribute.index,
-          asset_group_listing_group_filter.case_value.product_custom_attribute.value
-        FROM asset_group_listing_group_filter
-        WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
-    """
-    raw_rows = ads_client._run_search(client, ADS_CUSTOMER_ID, raw_query)
-    print(f"{len(raw_rows)} raw rows")
-    for row in raw_rows[:20]:
-        f = row.asset_group_listing_group_filter
-        print(" ", {
-            "campaign": row.campaign.name,
-            "asset_group": row.asset_group.name,
-            "type": f.type.name,
-            "attr_index": f.case_value.product_custom_attribute.index.name,
-            "attr_value": f.case_value.product_custom_attribute.value,
-        })
+    grouped = defaultdict(list)
+    for row in filter_rows:
+        grouped[(row["campaign"], row["asset_group"])].append(row)
 
-    print("\n=== Google Ads: fetch_item_performance (last 3 days) ===")
-    from datetime import date, timedelta
-    date_to = date.today()
-    date_from = date_to - timedelta(days=2)
-    perf_rows = ads_client.fetch_item_performance(client, ADS_CUSTOMER_ID, str(date_from), str(date_to))
-    print(f"{len(perf_rows)} rows")
-    for row in perf_rows[:10]:
-        print(" ", row)
+    for (campaign, asset_group), rows in sorted(grouped.items()):
+        print(f"[{campaign}] / [{asset_group}]")
+        for r in rows:
+            kind = "INCLUDE" if r["included"] else "EXCLUDE"
+            print(f"    {kind}  index={r['custom_label_index']}  value={r['custom_label_value']!r}")
+    print()
 
-    print("\n=== Merchant API: fetch_products (raw, first 3) ===")
-    credentials = merchant_client.build_credentials()
-    products = merchant_client.fetch_products(credentials, MERCHANT_ACCOUNT_ID)
-    print(f"{len(products)} products total")
-    for p in products[:3]:
-        print(" ", repr(p))
+    print("=== Specifically: any row whose value looks like 'excluded' or 'single' (any index) ===")
+    for row in filter_rows:
+        v = (row["custom_label_value"] or "").lower()
+        if "exclud" in v or v == "single":
+            print(" ", row)
+
+    print("\n=== Specifically: 即納・ベストセラー AG's filter rows ===")
+    for row in filter_rows:
+        if row["asset_group"] == "即納・ベストセラー":
+            print(" ", row)
 
     print("\nAll checks completed without raising.")
 
