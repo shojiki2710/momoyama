@@ -84,7 +84,11 @@ def fetch_daily_total_sales(access_token, shop_domain, date_from, date_to):
     """{date_str: total_sales}, bucketed by the shop's own JST calendar day (matching
     generate_board.py's date_list). Cancelled orders are excluded; current_total_price_set
     reflects post-refund/post-edit amounts, so partial refunds already net out correctly."""
-    q = f"created_at:>='{date_from}T00:00:00+09:00' AND created_at:<='{date_to}T23:59:59+09:00'"
+    # status:any is required -- Shopify's orders search defaults to status:open only, silently
+    # excluding archived/closed orders. Without this, any order old enough to have been
+    # auto-archived (observed: ~2026-08-20, missing all orders before ~2026-06-21) drops out of
+    # the result with no error, and callers relying on .get(date, 0) see a false zero for that day.
+    q = f"status:any AND created_at:>='{date_from}T00:00:00+09:00' AND created_at:<='{date_to}T23:59:59+09:00'"
     totals = {}
     cursor = None
     while True:
