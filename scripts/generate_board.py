@@ -62,6 +62,7 @@ FIXTURES_DIR = SCRIPT_DIR / "dev_fixtures"
 
 GOOGLE_ADS_ACCOUNT = "795-169-0216"  # DirectApiClient strips dashes before calling the Ads API
 MERCHANT_ACCOUNT = "273780463"
+SHOPIFY_SHOP_DOMAIN = "momoyama7245.myshopify.com"
 HISTORY_DAYS = 90  # rolling window baked into the page; bounds the custom date-range picker
 DEFAULT_PRESET_DAYS = 30  # initial selection shown on page load
 JST = ZoneInfo("Asia/Tokyo")
@@ -138,12 +139,14 @@ class DirectApiClient:
 
     def __init__(self):
         sys.path.insert(0, str(REPO_ROOT))
-        from scripts.direct_api import ads_client, merchant_client
+        from scripts.direct_api import ads_client, merchant_client, shopify_client
 
         self._ads = ads_client
         self._merchant = merchant_client
+        self._shopify = shopify_client
         self._ads_client = ads_client.build_client()
         self._merchant_credentials = merchant_client.build_credentials()
+        self._shopify_token = shopify_client.build_credentials()
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
         fields = tuple(fields)
@@ -183,6 +186,11 @@ class DirectApiClient:
                     for n in normalized
                 ]
 
+        elif connector == "shopify":
+            if fields == ("date", "total_sales"):
+                totals = self._shopify.fetch_daily_total_sales(self._shopify_token, account, date_from, date_to)
+                return [{"date": d, "total_sales": v} for d, v in totals.items()]
+
         raise RuntimeError(f"DirectApiClient has no mapping for connector={connector!r} fields={fields!r}")
 
 
@@ -201,6 +209,7 @@ class FixtureClient:
         ("google_merchant", ("product_id", "product_custom_label_0", "product_title", "product_image_link")): "step2_merchant_products.json",
         ("google_ads", ("date", "campaign", "product_item_id", "cost", "conversions", "conversions_value")): "step3_item_performance_daily.json",
         ("google_ads", ("date", "cost", "conversions_value")): "step4_account_daily_totals.json",
+        ("shopify", ("date", "total_sales")): "step5_shopify_daily_sales.json",
     }
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
@@ -407,6 +416,27 @@ def fetch_account_daily_totals(client, date_from, date_to):
     return totals
 
 
+def fetch_shopify_daily_sales(client, date_from, date_to):
+    """{date_str: total_sales}, the whole store's own revenue (every order, every channel --
+    not just Google Ads-attributed). Feeds 売上高広告費率 (ad cost / total store sales), added
+    2026-08-20 to show what fraction of ALL store revenue advertising cost consumed, as a
+    counterpart to ROAS (which only measures return on the ad spend itself)."""
+    rows = client.get_data(
+        "shopify",
+        ["date", "total_sales"],
+        accounts=[SHOPIFY_SHOP_DOMAIN],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    totals = {}
+    for row in rows:
+        date = row.get("date")
+        if not date:
+            continue
+        totals[date] = totals.get(date, 0.0) + float(row.get("total_sales") or 0)
+    return totals
+
+
 def build_products(product_labels, performance, date_list):
     """Each product carries cost/cv/value as arrays aligned index-for-index with date_list, so
     the page can sum any contiguous slice client-side without refetching anything.
@@ -480,7 +510,7 @@ def build_campaign_of_ag():
 
 def render_html(
     products, date_list, raw_ag_status, structure_warnings, generated_at,
-    account_cost, account_value,
+    account_cost, account_value, shop_sales,
 ):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
@@ -506,6 +536,7 @@ def render_html(
     html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
     html = html.replace("__ACCOUNT_COST_JSON__", js_json(account_cost))
     html = html.replace("__ACCOUNT_VALUE_JSON__", js_json(account_value))
+    html = html.replace("__SHOP_SALES_JSON__", js_json(shop_sales))
     html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
@@ -536,7 +567,7 @@ def main():
     else:
         required_env = (
             "ADS_DEVELOPER_TOKEN", "ADS_CLIENT_ID", "ADS_CLIENT_SECRET",
-            "ADS_REFRESH_TOKEN", "GCP_SERVICE_ACCOUNT_JSON",
+            "ADS_REFRESH_TOKEN", "GCP_SERVICE_ACCOUNT_JSON", "SHOPIFY_ACCESS_TOKEN",
         )
         missing = [v for v in required_env if not os.environ.get(v)]
         if missing:
@@ -551,6 +582,8 @@ def main():
     account_daily_totals = fetch_account_daily_totals(client, str(date_from), str(date_to))
     account_cost = [round(account_daily_totals.get(d, {}).get("cost", 0), 2) for d in date_list]
     account_value = [round(account_daily_totals.get(d, {}).get("value", 0), 2) for d in date_list]
+    shopify_daily_sales = fetch_shopify_daily_sales(client, str(date_from), str(date_to))
+    shop_sales = [round(shopify_daily_sales.get(d, 0), 2) for d in date_list]
 
     if not products:
         sys.exit(
@@ -568,7 +601,7 @@ def main():
     generated_at = now_jst.strftime("%Y-%m-%d %H:%M JST")
     html = render_html(
         products, date_list, raw_ag_status, structure_warnings, generated_at,
-        account_cost, account_value,
+        account_cost, account_value, shop_sales,
     )
 
     active_count = sum(1 for v in raw_ag_status.values() if v)

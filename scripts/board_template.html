@@ -44,6 +44,14 @@
   .hero-roas-value { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
   .hero-roas-value .unit { font-size: 22px; font-weight: 700; margin-left: 2px; }
   .hero-roas-sub { font-size: 11.5px; opacity: 0.65; margin-top: 4px; }
+  .hero-secondary {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.14);
+    font-size: 12px;
+  }
+  .hero-secondary-label { opacity: 0.7; margin-right: 7px; }
+  .hero-secondary-value { font-weight: 700; font-size: 16px; }
   .below-target { color: #ff8a80; }
   .above-target { color: #8affa0; }
   .campaign-bar {
@@ -314,6 +322,7 @@
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
   const ACCOUNT_COST = __ACCOUNT_COST_JSON__;   // true account-wide daily ad cost, aligned to DATES (every campaign, not just classified spend)
   const ACCOUNT_VALUE = __ACCOUNT_VALUE_JSON__; // true account-wide daily conversion value, aligned to DATES
+  const SHOP_SALES = __SHOP_SALES_JSON__;       // whole store's own daily revenue (every order, every channel), aligned to DATES
   const STRUCTURE_WARNINGS = __STRUCTURE_WARNINGS_JSON__; // account structure the pipeline doesn't recognize (new campaigns/AGs/labels)
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
@@ -378,6 +387,16 @@
     const overallRoasText = overallRoas === null ? "—" : overallRoas.toFixed(1);
     const belowTarget = overallRoas === null || overallRoas < ROAS_GOOD;
 
+    // 売上高広告費率 = ad cost / whole-store revenue (every order, every channel) -- distinct
+    // from ROAS above, which only measures return on the ad spend itself against ad-attributed
+    // value. Uses the same true totalCost computed above, over the same selected range.
+    let totalShopSales = 0;
+    for (let i = rangeStart; i <= rangeEnd; i++){
+      totalShopSales += SHOP_SALES[i] || 0;
+    }
+    const adToSalesRatio = totalShopSales > 0 ? (totalCost / totalShopSales * 100) : null;
+    const adToSalesText = adToSalesRatio === null ? "—" : adToSalesRatio.toFixed(1) + "%";
+
     // Which AG columns to show for THIS date range: only ones with actual spend in it, so a
     // paused campaign's pre-pause history still shows up when the range reaches back far enough,
     // instead of the whole AG silently vanishing the moment it gets paused.
@@ -426,6 +445,10 @@
         <div class="hero-roas-label">全体ROAS</div>
         <div class="hero-roas-value">${overallRoasText}<span class="unit">%</span></div>
         <div class="hero-roas-sub ${belowTarget ? 'below-target' : 'above-target'}">基準${ROAS_GOOD}%${belowTarget ? 'に対し未達' : '以上を達成'}</div>
+        <div class="hero-secondary">
+          <span class="hero-secondary-label">売上高広告費率</span>
+          <span class="hero-secondary-value">${adToSalesText}</span>
+        </div>
       </div>
     `;
     root.appendChild(hero);
