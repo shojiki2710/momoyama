@@ -52,8 +52,6 @@
   }
   .hero-secondary-label { opacity: 0.7; margin-right: 7px; }
   .hero-secondary-value { font-weight: 700; font-size: 16px; }
-  .below-target { color: #ff8a80; }
-  .above-target { color: #8affa0; }
   .campaign-bar {
     display: flex;
     gap: 10px;
@@ -385,7 +383,6 @@
     }
     const overallRoas = totalCost > 0 ? (totalValue/totalCost*100) : null;
     const overallRoasText = overallRoas === null ? "—" : overallRoas.toFixed(1);
-    const belowTarget = overallRoas === null || overallRoas < ROAS_GOOD;
 
     // 売上高広告費率 = ad cost / whole-store revenue (every order, every channel) -- distinct
     // from ROAS above, which only measures return on the ad spend itself against ad-attributed
@@ -444,7 +441,7 @@
       <div class="hero-right">
         <div class="hero-roas-label">全体ROAS</div>
         <div class="hero-roas-value">${overallRoasText}<span class="unit">%</span></div>
-        <div class="hero-roas-sub ${belowTarget ? 'below-target' : 'above-target'}">基準${ROAS_GOOD}%${belowTarget ? 'に対し未達' : '以上を達成'}</div>
+        <div class="hero-roas-sub">売上総額 ${yen(totalValue)}／広告費総額 ${yen(totalCost)}</div>
         <div class="hero-secondary">
           <span class="hero-secondary-label">売上高広告費率</span>
           <span class="hero-secondary-value">${adToSalesText}</span>
