@@ -19,6 +19,16 @@ Query date boundaries are given explicit JST (+09:00) offsets rather than bare d
 live (2026-08-20) that Shopify's `created_at:>=`/`<=` search filters interpret bare dates in the
 shop's own timezone, but being explicit removes any ambiguity about which day an order near
 midnight lands in.
+
+Requires the `read_all_orders` scope, not just `read_orders` -- confirmed live 2026-08-20 that
+Shopify's orders() query silently caps results to the last 60 days without it (no error, just
+missing orders), which had been zero-filling ~29 of the 90 days generate_board.py asks for. An
+initial attempt at diagnosing this as a `status:open`-default issue (adding `status:any` to the
+query) was a red herring: `any` isn't a valid value for that field (the API returns a warning and
+ignores the clause) and had no effect either way -- the 60-day cap was the whole story. Granting
+the scope in Dev Dashboard > Configuration wasn't enough by itself; the store's install also
+needed to be re-approved once (Shopify admin > Apps > this app > re-authorize) before a fresh
+client_credentials token actually carried `read_all_orders`.
 """
 import json
 import os
@@ -84,11 +94,7 @@ def fetch_daily_total_sales(access_token, shop_domain, date_from, date_to):
     """{date_str: total_sales}, bucketed by the shop's own JST calendar day (matching
     generate_board.py's date_list). Cancelled orders are excluded; current_total_price_set
     reflects post-refund/post-edit amounts, so partial refunds already net out correctly."""
-    # status:any is required -- Shopify's orders search defaults to status:open only, silently
-    # excluding archived/closed orders. Without this, any order old enough to have been
-    # auto-archived (observed: ~2026-08-20, missing all orders before ~2026-06-21) drops out of
-    # the result with no error, and callers relying on .get(date, 0) see a false zero for that day.
-    q = f"status:any AND created_at:>='{date_from}T00:00:00+09:00' AND created_at:<='{date_to}T23:59:59+09:00'"
+    q = f"created_at:>='{date_from}T00:00:00+09:00' AND created_at:<='{date_to}T23:59:59+09:00'"
     totals = {}
     cursor = None
     while True:
