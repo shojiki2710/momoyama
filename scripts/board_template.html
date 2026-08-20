@@ -316,8 +316,10 @@
   const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
-  const CAMPAIGN_OF_AG = __CAMPAIGN_OF_AG_JSON__; // display AG name -> campaign name (missing = "その他" bucket)
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
+  const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
+  const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
+  const CAMPAIGN_CV = __CAMPAIGN_CV_JSON__;       // {family: [daily conversions]}
   const ACCOUNT_COST = __ACCOUNT_COST_JSON__;   // true account-wide daily ad cost, aligned to DATES (every campaign, not just classified spend)
   const ACCOUNT_VALUE = __ACCOUNT_VALUE_JSON__; // true account-wide daily conversion value, aligned to DATES
   const SHOP_SALES = __SHOP_SALES_JSON__;       // whole store's own daily revenue (every order, every channel), aligned to DATES
@@ -414,22 +416,21 @@
 
     const periodText = `${startDate}〜${endDate}／表示中${shownAgGroups.length}AG（${shownAgGroups.map(g=>g.ag).join("・") || "該当なし"}）・全${products.length}商品`;
 
-    // Campaign-level tier, between the account-wide total and the per-AG columns: groups each
-    // product's AG into its parent campaign via CAMPAIGN_OF_AG, falling back to "その他" for any
-    // AG the pipeline hasn't been taught a campaign for yet (rather than dropping it silently).
-    const campaignGroupsMap = {};
-    stats.forEach(x => {
-      const campaign = CAMPAIGN_OF_AG[x.p.ag] || "その他";
-      const g = campaignGroupsMap[campaign] || (campaignGroupsMap[campaign] = { campaign, cost: 0, cv: 0, value: 0 });
-      g.cost += x.agg.cost;
-      g.cv += x.agg.cv;
-      g.value += x.agg.value;
-    });
-    const campaignNames = CAMPAIGN_ORDER.concat(Object.keys(campaignGroupsMap).filter(c => !CAMPAIGN_ORDER.includes(c)));
-    const shownCampaignGroups = campaignNames
-      .map(c => campaignGroupsMap[c])
-      .filter(g => g && g.cost > 0)
-      .map(g => ({ ...g, roas: g.cost > 0 ? (g.value / g.cost * 100) : null }));
+    // Campaign-level tier, between the account-wide total and the per-AG columns: TRUE per-
+    // campaign totals from CAMPAIGN_COST/CAMPAIGN_VALUE/CAMPAIGN_CV (every product actually
+    // running under that campaign in Google Ads, independent of custom_label_0 classification --
+    // see generate_board.py's fetch_campaign_daily_totals), not a sum of only the classified
+    // products shown in the AG columns below. A product currently excluded from every AG's
+    // targeting (e.g. custom_label_0="excluded") still counts here if it has real spend.
+    const shownCampaignGroups = CAMPAIGN_ORDER.map(campaign => {
+      let cost = 0, cv = 0, value = 0;
+      for (let i = rangeStart; i <= rangeEnd; i++){
+        cost += (CAMPAIGN_COST[campaign] || [])[i] || 0;
+        cv += (CAMPAIGN_CV[campaign] || [])[i] || 0;
+        value += (CAMPAIGN_VALUE[campaign] || [])[i] || 0;
+      }
+      return { campaign, cost, cv, value, roas: cost > 0 ? (value / cost * 100) : null };
+    }).filter(g => g.cost > 0);
 
     const hero = document.createElement("div");
     hero.className = "hero-bar";

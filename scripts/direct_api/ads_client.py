@@ -153,6 +153,40 @@ def fetch_account_daily_totals(client, customer_id, date_from, date_to):
     ]
 
 
+def fetch_campaign_daily_totals(client, customer_id, date_from, date_to):
+    """TRUE per-campaign daily cost/conversions_value -- every product under that campaign,
+    regardless of custom_label_0 classification. Added 2026-08-20 for the same reason as
+    fetch_account_daily_totals (see its docstring), one level down: the campaign-tier ROAS cards
+    (Best-Selling/Second-Team/Gift-Scene) were summing only classified-product spend
+    (fetch_item_performance joined against custom_label_0), missing whatever ran under an
+    unrecognized label within that campaign -- confirmed live 2026-08-20 that e.g. the "excluded"
+    label is the ２軍 (Second-Team) AG's own listing-group-filter exclusion value, so a product
+    that earned spend before being excluded has no recoverable label but its spend still counts
+    toward Second-Team's real total. The `campaign` resource aggregates per campaign per day,
+    independent of any product/AG join."""
+    query = f"""
+        SELECT
+          campaign.name,
+          segments.date,
+          metrics.cost_micros,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM campaign
+        WHERE segments.date BETWEEN '{date_from}' AND '{date_to}'
+    """
+    rows = _run_search(client, customer_id, query)
+    return [
+        {
+            "campaign": row.campaign.name,
+            "date": row.segments.date,
+            "cost": row.metrics.cost_micros / 1_000_000,
+            "conversions": row.metrics.conversions,
+            "conversions_value": row.metrics.conversions_value,
+        }
+        for row in rows
+    ]
+
+
 def fetch_item_performance(client, customer_id, date_from, date_to):
     """Daily per-product performance across all campaigns -- Windsor's item_id-level step.
     Cost comes back as cost_micros; divide by 1_000_000 here so callers get real currency units."""

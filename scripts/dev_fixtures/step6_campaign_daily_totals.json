@@ -1,0 +1,296 @@
+[
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-22",
+    "cost": 12085.87,
+    "conversions_value": 49210.36,
+    "conversions": 4.56
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-22",
+    "cost": 3769.47,
+    "conversions_value": 4849.81,
+    "conversions": 1.37
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 6703.57,
+    "conversions_value": 11694.82,
+    "conversions": 2.15
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-23",
+    "cost": 9114.46,
+    "conversions_value": 36588.09,
+    "conversions": 3.42
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-23",
+    "cost": 2852.47,
+    "conversions_value": 4034.14,
+    "conversions": 1.05
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 4822.38,
+    "conversions_value": 7714.53,
+    "conversions": 1.73
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-24",
+    "cost": 10217.13,
+    "conversions_value": 44664.93,
+    "conversions": 4.28
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-24",
+    "cost": 3360.91,
+    "conversions_value": 3768.7,
+    "conversions": 1.24
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 7272.17,
+    "conversions_value": 14086.39,
+    "conversions": 2.57
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-25",
+    "cost": 11566.07,
+    "conversions_value": 47868.21,
+    "conversions": 3.86
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-25",
+    "cost": 2705.34,
+    "conversions_value": 3005.23,
+    "conversions": 1.18
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 6081.65,
+    "conversions_value": 8972.69,
+    "conversions": 2.43
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-26",
+    "cost": 15680.35,
+    "conversions_value": 57865.69,
+    "conversions": 6.85
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-26",
+    "cost": 4049.98,
+    "conversions_value": 5208.01,
+    "conversions": 1.35
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 9261.02,
+    "conversions_value": 17361.06,
+    "conversions": 3.2
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-27",
+    "cost": 13068.25,
+    "conversions_value": 54473.04,
+    "conversions": 5.83
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-27",
+    "cost": 3543.5,
+    "conversions_value": 4831.05,
+    "conversions": 1.11
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 6996.75,
+    "conversions_value": 11102.88,
+    "conversions": 2.21
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-28",
+    "cost": 15475.92,
+    "conversions_value": 71109.22,
+    "conversions": 5.42
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-28",
+    "cost": 4047.25,
+    "conversions_value": 5589.44,
+    "conversions": 1.44
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 6937.82,
+    "conversions_value": 10837.77,
+    "conversions": 2.94
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-29",
+    "cost": 10651.9,
+    "conversions_value": 37114.08,
+    "conversions": 4.81
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-29",
+    "cost": 3349.1,
+    "conversions_value": 4223.74,
+    "conversions": 1.23
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 6847.61,
+    "conversions_value": 11244.61,
+    "conversions": 3.03
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-30",
+    "cost": 14889.61,
+    "conversions_value": 65764.01,
+    "conversions": 6.23
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-30",
+    "cost": 3035.26,
+    "conversions_value": 3602.22,
+    "conversions": 1.24
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 8019.27,
+    "conversions_value": 13510.01,
+    "conversions": 3.6
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-31",
+    "cost": 15756.76,
+    "conversions_value": 61087.53,
+    "conversions": 5.91
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-31",
+    "cost": 3274.92,
+    "conversions_value": 4422.74,
+    "conversions": 1.24
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 8139.71,
+    "conversions_value": 12881.79,
+    "conversions": 2.68
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-01",
+    "cost": 8405.26,
+    "conversions_value": 31932.45,
+    "conversions": 3.09
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-01",
+    "cost": 2980.67,
+    "conversions_value": 4174.83,
+    "conversions": 1.05
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 4633.11,
+    "conversions_value": 7277.03,
+    "conversions": 1.72
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-02",
+    "cost": 9521.23,
+    "conversions_value": 33056.49,
+    "conversions": 3.33
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-02",
+    "cost": 3212.58,
+    "conversions_value": 3772.51,
+    "conversions": 1.21
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 6004.43,
+    "conversions_value": 10046.53,
+    "conversions": 2.42
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-03",
+    "cost": 9822.23,
+    "conversions_value": 42022.18,
+    "conversions": 3.07
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-03",
+    "cost": 2625.89,
+    "conversions_value": 3560.84,
+    "conversions": 0.82
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 5226.16,
+    "conversions_value": 8673.26,
+    "conversions": 1.72
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-04",
+    "cost": 18434.12,
+    "conversions_value": 68644.13,
+    "conversions": 6.34
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-04",
+    "cost": 6278.61,
+    "conversions_value": 8905.14,
+    "conversions": 2.5
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 10356.27,
+    "conversions_value": 19638.4,
+    "conversions": 4.26
+  }
+]
