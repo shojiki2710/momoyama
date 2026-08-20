@@ -90,6 +90,10 @@ AG_TO_LABELS = {
     "結婚祝い": ["wedding"],
     "すぐ届く": ["quick-ship"],
     "ベストセラー": ["best_seller_nigaoe", "best_seller_signed"],
+    # New Best-Selling AG, launched under campaign "2026.4.28 P-MAX Best-Selling" -- caught by
+    # the structure audit 2026-08-20, confirmed with ふなとさん as its own display column (not
+    # folded into the existing "Best-Selling" AG's nigaoe/signed split).
+    "即納・ベストセラー": ["best_seller_quickship"],
 }
 
 LABEL_TO_DISPLAY_AG = {
@@ -99,10 +103,21 @@ LABEL_TO_DISPLAY_AG = {
     "quick-ship": "すぐ届く",
     "best_seller_nigaoe": "Best-Selling(似顔絵)",
     "best_seller_signed": "Best-Selling(名入れ)",
+    "best_seller_quickship": "即納・ベストセラー",
 }
 
+# Custom labels confirmed with ふなとさん (2026-08-20) to be real but deliberately NOT tied to any
+# AG -- excluded from the structure audit's "未対応カスタムラベル" warnings rather than treated
+# as an unrecognized gap. "excluded": products intentionally excluded from advertising entirely.
+# "single": a legacy product-data field no longer in active use.
+KNOWN_UNMAPPED_LABELS = {"excluded", "single"}
+
 # preferred column order when the AG is active; unexpected/new active AGs are appended after.
-AG_DISPLAY_ORDER = ["還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く", "Best-Selling(似顔絵)", "Best-Selling(名入れ)", SECOND_TEAM_DISPLAY_AG]
+AG_DISPLAY_ORDER = [
+    "還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く",
+    "Best-Selling(似顔絵)", "Best-Selling(名入れ)", "即納・ベストセラー",
+    SECOND_TEAM_DISPLAY_AG,
+]
 
 # raw AG name -> the campaign it lives under, for the campaign-level ROAS tier between the
 # account-wide total and the per-AG columns (added 2026-08-18). Second-Team gets its own fixed
@@ -113,6 +128,7 @@ RAW_AG_TO_CAMPAIGN = {
     "結婚祝い": "Gift-Scene",
     "すぐ届く": "Gift-Scene",
     "ベストセラー": "Best-Selling",
+    "即納・ベストセラー": "Best-Selling",
 }
 CAMPAIGN_DISPLAY_ORDER = ["Best-Selling", "Second-Team", "Gift-Scene"]
 
@@ -326,6 +342,8 @@ def audit_structure(all_campaigns, unrecognized_ags, product_labels, performance
 
     seen_labels = set()
     for label in sorted(labels_with_spend):
+        if label in KNOWN_UNMAPPED_LABELS:
+            continue
         if label not in LABEL_TO_DISPLAY_AG and label not in seen_labels:
             seen_labels.add(label)
             warnings.append(f"未対応カスタムラベル「{label}」の商品に広告費用が発生しています。")
