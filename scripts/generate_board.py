@@ -23,6 +23,15 @@ Pipeline (see the Notion spec "仕様書：リスティンググループ商品�
      current status. Which AG columns are actually shown for a given viewer-selected date range
      is decided client-side, per range, based on whether that AG had any spend in it -- so
      pausing a campaign doesn't erase its pre-pause history from the board (see board_template.html).
+  5. google_ads:      asset_group_listing_group_filter (campaign, asset_group, included,
+                       custom_label_index, custom_label_value), intersected with which
+                       (campaign, asset_group) pairs are currently ENABLED -> per-product "where is
+                       this actually served RIGHT NOW" (see build_current_targeting_index/
+                       current_target_ag), independent of steps 1-4's historical AG column/ROAS.
+                       Added 2026-08-21 to answer "is the board's AG grouping still accurate to the
+                       live account" without touching any existing history/ROAS math -- surfaced as
+                       a per-card badge only (see board_template.html), never changes which column
+                       a product's history appears under.
 
 Step 3 fetches a rolling HISTORY_DAYS-day window at daily granularity (not pre-aggregated) so the
 published page can let viewers pick any sub-range (7d/30d/90d presets or a custom range) and
@@ -195,6 +204,8 @@ class DirectApiClient:
                 return self._ads.fetch_account_daily_totals(self._ads_client, customer_id, date_from, date_to)
             if fields == ("campaign", "date", "cost", "conversions", "conversions_value"):
                 return self._ads.fetch_campaign_daily_totals(self._ads_client, customer_id, date_from, date_to)
+            if fields == ("campaign", "asset_group", "included", "custom_label_index", "custom_label_value"):
+                return self._ads.fetch_listing_group_filters(self._ads_client, customer_id)
 
         elif connector == "google_merchant":
             if fields == ("product_id", "product_custom_label_0", "product_title", "product_image_link"):
@@ -235,6 +246,7 @@ class FixtureClient:
         ("google_ads", ("date", "cost", "conversions_value")): "step4_account_daily_totals.json",
         ("google_ads", ("campaign", "date", "cost", "conversions", "conversions_value")): "step6_campaign_daily_totals.json",
         ("shopify", ("date", "total_sales")): "step5_shopify_daily_sales.json",
+        ("google_ads", ("campaign", "asset_group", "included", "custom_label_index", "custom_label_value")): "step7_listing_group_filters.json",
     }
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
@@ -284,6 +296,101 @@ def fetch_ag_status(client, date_from, date_to):
                 "campaign": campaign, "asset_group": ag_name, "status": ag_status, "enabled": enabled,
             })
     return status, unrecognized_ags
+
+
+def fetch_enabled_ag_pairs(client, date_from, date_to):
+    """Set of (campaign, raw_asset_group_name) pairs that are truly live right now -- i.e. BOTH
+    the asset group and its parent campaign are ENABLED. Needed instead of AG name alone because
+    the same raw AG name is reused across old paused campaigns (confirmed 2026-08-05, see
+    fetch_ag_status's docstring) and again 2026-08-21: a paused duplicate campaign named
+    "...Second-Team（アセットレス）" reuses the AG name "２軍" too -- collapsing by name alone
+    would wrongly treat its (paused) filter rows as live. Feeds
+    build_current_targeting_index/current_target_ag below."""
+    rows = client.get_data(
+        "google_ads",
+        ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    pairs = set()
+    for row in rows:
+        campaign = row.get("campaign") or ""
+        if not any(k in campaign for k in CAMPAIGN_KEYWORDS):
+            continue
+        campaign_status = (row.get("campaign_status") or "").upper()
+        ag_status = (row.get("asset_group_status") or "").upper()
+        if campaign_status == "ENABLED" and ag_status == "ENABLED":
+            pairs.add((campaign, row.get("asset_group_name")))
+    return pairs
+
+
+def fetch_listing_group_filters(client, date_from, date_to):
+    """Raw INCLUDE/EXCLUDE listing-group-filter leaf rows for every asset group in the account,
+    regardless of status -- callers should intersect with fetch_enabled_ag_pairs to see only
+    what's currently live. See ads_client.fetch_listing_group_filters for field semantics."""
+    return client.get_data(
+        "google_ads",
+        ["campaign", "asset_group", "included", "custom_label_index", "custom_label_value"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+def build_current_targeting_index(filter_rows, enabled_pairs):
+    """Builds a label -> current-display-AG lookup reflecting the account's LIVE listing-group-
+    filter configuration right now, independent of the historical AG-column grouping used
+    everywhere else on the board (AG_TO_LABELS/LABEL_TO_DISPLAY_AG). Added 2026-08-21 so the board
+    can show, per product, whether it's still actually being served by the AG its history column
+    implies -- without touching that column's own historical grouping or ROAS math (see
+    current_target_ag). Only considers filter rows belonging to a currently-ENABLED
+    (campaign, asset_group) pair -- a paused AG's old filter rows don't reflect where a product is
+    actually served today.
+
+    Returns (specific: {label_value: display_ag}, catchall_display: str|None,
+    catchall_excludes: set[label_value]). catchall_display/catchall_excludes describe the one
+    "everything else" AG, if any is currently enabled (confirmed live 2026-08-21: only ２軍 has a
+    catch-all INCLUDE node in this account, and Gift-Scene's AGs -- 還暦祝い/誕生日祝い/結婚祝い/
+    すぐ届く -- are all currently paused, so products with those labels presently fall through to
+    ２軍's catch-all instead of their nominal AG)."""
+    specific = {}
+    catchall_raw_ag = None
+    catchall_display = None
+    for row in filter_rows:
+        if (row["campaign"], row["asset_group"]) not in enabled_pairs:
+            continue
+        if row["included"] and row["custom_label_value"]:
+            value = row["custom_label_value"]
+            specific[value] = LABEL_TO_DISPLAY_AG.get(value, row["asset_group"])
+        elif row["included"] and not row["custom_label_value"]:
+            catchall_raw_ag = row["asset_group"]
+            catchall_display = (
+                SECOND_TEAM_DISPLAY_AG if catchall_raw_ag == SECOND_TEAM_RAW_AG_NAME else catchall_raw_ag
+            )
+
+    catchall_excludes = set()
+    if catchall_raw_ag is not None:
+        for row in filter_rows:
+            if (row["campaign"], row["asset_group"]) not in enabled_pairs:
+                continue
+            if row["asset_group"] != catchall_raw_ag or row["included"] or not row["custom_label_value"]:
+                continue
+            catchall_excludes.add(row["custom_label_value"])
+
+    return specific, catchall_display, catchall_excludes
+
+
+def current_target_ag(label, targeting_index):
+    """Which display-AG column a product with this custom_label_0 value is ACTUALLY being served
+    under right now, per the live listing-group-filter config -- or None if no currently-enabled
+    AG targets it at all. label may be None/empty (no custom label set)."""
+    specific, catchall_display, catchall_excludes = targeting_index
+    if label and label in specific:
+        return specific[label]
+    if catchall_display and label not in catchall_excludes:
+        return catchall_display
+    return None
 
 
 def fetch_all_campaigns(client, date_from, date_to):
@@ -493,7 +600,7 @@ def fetch_shopify_daily_sales(client, date_from, date_to):
     return totals
 
 
-def build_products(product_labels, performance, date_list):
+def build_products(product_labels, performance, date_list, targeting_index):
     """Each product carries cost/cv/value as arrays aligned index-for-index with date_list, so
     the page can sum any contiguous slice client-side without refetching anything.
 
@@ -502,7 +609,15 @@ def build_products(product_labels, performance, date_list):
     paused (confirmed as a real problem on 2026-08-03 -- pausing the Gift-Scene campaign made
     even its pre-pause history vanish from the board). Which AG columns are worth showing for a
     given viewer-selected date range is instead decided client-side, per range, based on whether
-    that AG actually had spend in it -- see board_template.html."""
+    that AG actually had spend in it -- see board_template.html.
+
+    "currentAg" (added 2026-08-21) is separate from all of the above and from "ag": it's where the
+    product is ACTUALLY served today per the live listing-group-filter config (see
+    build_current_targeting_index) -- equal to "ag" when nothing has changed, a different display
+    AG name when it's now actually served elsewhere, or None when no currently-enabled AG targets
+    it at all. Used only to render a "現在は別のAGで配信中/配信対象外" badge on top of the
+    unchanged historical column/ROAS; board_template.html decides whether to show it by comparing
+    currentAg to ag itself."""
     products = []
     for (bucket, item_id), by_date in performance.items():
         info = product_labels.get(item_id)
@@ -525,6 +640,7 @@ def build_products(product_labels, performance, date_list):
             value_arr.append(round(day["value"], 2) if day else 0)
         products.append({
             "ag": display_ag,
+            "currentAg": current_target_ag(info["label"], targeting_index),
             "title": info["title"] or item_id,
             "id": item_id,
             "img": info["image"],
@@ -618,7 +734,10 @@ def main():
     all_campaigns = fetch_all_campaigns(client, str(date_from), str(date_to))
     product_labels = fetch_product_labels(client, str(date_from), str(date_to))
     performance = fetch_item_performance(client, str(date_from), str(date_to))
-    products = build_products(product_labels, performance, date_list)
+    enabled_ag_pairs = fetch_enabled_ag_pairs(client, str(date_from), str(date_to))
+    listing_group_filters = fetch_listing_group_filters(client, str(date_from), str(date_to))
+    targeting_index = build_current_targeting_index(listing_group_filters, enabled_ag_pairs)
+    products = build_products(product_labels, performance, date_list, targeting_index)
     account_daily_totals = fetch_account_daily_totals(client, str(date_from), str(date_to))
     account_cost = [round(account_daily_totals.get(d, {}).get("cost", 0), 2) for d in date_list]
     account_value = [round(account_daily_totals.get(d, {}).get("value", 0), 2) for d in date_list]

@@ -1,0 +1,58 @@
+[
+    {
+        "campaign": "2026.4.28 P-MAX Best-Selling",
+        "asset_group": "ベストセラー",
+        "included": true,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "best_seller_nigaoe"
+    },
+    {
+        "campaign": "2026.4.28 P-MAX Best-Selling",
+        "asset_group": "ベストセラー",
+        "included": true,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "best_seller_signed"
+    },
+    {
+        "campaign": "2026.4.28 P-MAX Best-Selling",
+        "asset_group": "ベストセラー",
+        "included": false,
+        "custom_label_index": null,
+        "custom_label_value": null
+    },
+    {
+        "campaign": "2026.8.1 P-MAX Second-Team",
+        "asset_group": "２軍",
+        "included": true,
+        "custom_label_index": null,
+        "custom_label_value": null
+    },
+    {
+        "campaign": "2026.8.1 P-MAX Second-Team",
+        "asset_group": "２軍",
+        "included": false,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "best_seller_nigaoe"
+    },
+    {
+        "campaign": "2026.8.1 P-MAX Second-Team",
+        "asset_group": "２軍",
+        "included": false,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "best_seller_signed"
+    },
+    {
+        "campaign": "2026.8.1 P-MAX Second-Team",
+        "asset_group": "２軍",
+        "included": false,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "best_seller_quickship"
+    },
+    {
+        "campaign": "2026.8.1 P-MAX Second-Team",
+        "asset_group": "２軍",
+        "included": false,
+        "custom_label_index": "INDEX0",
+        "custom_label_value": "excluded"
+    }
+]

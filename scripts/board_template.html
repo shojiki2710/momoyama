@@ -265,6 +265,23 @@
     white-space: nowrap;
   }
   .card-body { flex: 1; min-width: 0; }
+  .targeting-badge {
+    display: block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+  .targeting-moved {
+    background: rgba(94, 122, 214, 0.12);
+    color: #3d4f9e;
+  }
+  .targeting-excluded {
+    background: rgba(214, 69, 69, 0.1);
+    color: #a43a3a;
+  }
   .card-title {
     font-size: 12px;
     line-height: 1.4;
@@ -577,12 +594,19 @@
         card.className = "card " + grade(agg.roas);
         card.title = p.title;
         const thumb = p.img ? `<img class="card-thumb" src="${p.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="card-thumb"></div>`;
+        let targetingBadge = "";
+        if (p.currentAg == null) {
+          targetingBadge = `<span class="targeting-badge targeting-excluded">✕ 現在は配信対象外</span>`;
+        } else if (p.currentAg !== p.ag) {
+          targetingBadge = `<span class="targeting-badge targeting-moved">↳ 現在は「${p.currentAg}」で配信中</span>`;
+        }
         card.innerHTML = `
           <div class="card-thumb-wrap">
             ${thumb}
             <span class="roas-badge roas-badge-thumb ${grade(agg.roas)}">${pct(agg.roas)}</span>
           </div>
           <div class="card-body">
+            ${targetingBadge}
             <div class="card-title">${p.title}</div>
             <div class="card-id">${p.id}</div>
             <div class="card-stats-secondary">
