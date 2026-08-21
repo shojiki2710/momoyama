@@ -2,14 +2,15 @@ name: Update listing group board
 
 on:
   schedule:
-    # Compensating for an observed, remarkably consistent ~9h43m scheduling delay on this repo
-    # (measured across 6 scheduled runs 2026-07-30 through 2026-08-06: actual firing landed
-    # 9h30m-9h54m after the requested time, every single day -- not occasional flakiness, a
-    # steady offset). Requesting 12:24 UTC (21:24 JST) so the ~9h43m delay lands actual execution
-    # near 07:07 JST, the original target. Empirical workaround, not a real fix -- if GitHub's
-    # delay behavior changes, this offset will need re-tuning. Re-measure via the Actions run
-    # history (event=="schedule" runs) if the board stops updating near morning JST again.
+    # GitHub Actions' scheduled-run delay for this repo isn't a fixed offset -- it depends on
+    # which UTC time-of-day is requested (global queue congestion varies by hour). Requesting
+    # 22:07 UTC consistently landed ~9h43m late (measured 2026-07-30 through 08-06); switching
+    # to 12:24 UTC dropped that to ~1h53m-3h09m (measured 2026-08-07/08). Two runs/day added
+    # 2026-08-21, spaced 12h apart -- actual landing times for each will vary independently and
+    # aren't guaranteed to land near any specific clock time. Re-measure via the Actions run
+    # history (event=="schedule" runs) if timing drifts enough to matter again.
     - cron: "24 12 * * *"
+    - cron: "24 0 * * *"
   workflow_dispatch: {}
 
 permissions:
