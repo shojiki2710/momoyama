@@ -424,7 +424,11 @@
       const cv = items.reduce((s,x)=>s+x.agg.cv,0);
       const value = items.reduce((s,x)=>s+x.agg.value,0);
       const agRoas = cost > 0 ? (value/cost*100) : null;
-      return { ag, items, cost, cv, value, agRoas };
+      // "商品N件" counts only items that actually ran (cost>0) within the selected period, not
+      // every product ever historically tied to this AG -- `items` itself stays unfiltered so
+      // zero-activity products still render as "期間内データなし" cards further down the column.
+      const activeCount = items.filter(x => x.agg.cost > 0).length;
+      return { ag, items, cost, cv, value, agRoas, activeCount };
     });
     // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
@@ -568,7 +572,7 @@
       root.appendChild(empty);
     }
 
-    shownAgGroups.forEach(({ag, items, cost, cv, value, agRoas}) => {
+    shownAgGroups.forEach(({ag, items, cost, cv, value, agRoas, activeCount}) => {
       const col = document.createElement("div");
       col.className = "ag-col";
 
@@ -581,7 +585,7 @@
           <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
           <span>費用 ${yen(cost)}</span>
           <span>CV ${cv.toFixed(1)}</span>
-          <span>商品 ${items.length}件</span>
+          <span>商品 ${activeCount}件</span>
         </div>
       `;
       col.appendChild(header);
