@@ -741,6 +741,11 @@ def render_html(
     ag_order = [ag for ag in AG_DISPLAY_ORDER if ag in present_ags]
     ag_order += sorted(present_ags - set(ag_order))
     ag_status = build_ag_status(raw_ag_status)
+    # display AG name -> raw Google Ads asset_group.name. Multiple display AGs can share one raw
+    # AG (ベストセラー(似顔絵)/(名入れ) are both really the single "ベストセラー" AG -- see
+    # DISPLAY_TO_RAW_AG above). Sent to the template so it can avoid mis-splitting the 商品データ
+    # 広告比率 denominator/numerator across those shared columns (2026-08-23 fix).
+    raw_ag_of = {ag: DISPLAY_TO_RAW_AG.get(ag, ag) for ag in ag_order}
 
     def js_string_escape(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -754,6 +759,7 @@ def render_html(
     html = html.replace("__PRODUCTS_JSON__", js_json(products))
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
+    html = html.replace("__RAW_AG_OF_JSON__", js_json(raw_ag_of))
     html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
     html = html.replace("__ACCOUNT_COST_JSON__", js_json(account_cost))
     html = html.replace("__ACCOUNT_VALUE_JSON__", js_json(account_value))

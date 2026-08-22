@@ -335,6 +335,10 @@
   const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
+  const RAW_AG_OF = __RAW_AG_OF_JSON__;        // display AG name -> raw Google Ads asset_group.name. Multiple display AGs can share
+                                                // one raw AG (ベストセラー(似顔絵)/(名入れ) are both really the single "ベストセラー" AG,
+                                                // split only by Merchant Center custom_label_0) -- used below so 商品データ広告比率
+                                                // doesn't mis-split a shared asset_group-level denominator across those columns.
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
   const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
   const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
@@ -449,13 +453,31 @@
       // that forced Gift-Scene's retirement (Discover clicks grew ~740x there before anyone
       // noticed) -- see the shopping-ratio audit banner below for the fixed-window early-warning
       // check on this same signal.
-      const shoppingRatio = trueCost > 0 ? (cost / trueCost * 100) : null;
+      //
+      // Numerator fix (2026-08-23, funato-san verification): when several display AGs share one
+      // raw asset_group (似顔絵/名入れ), `trueCost` is necessarily identical across all of them --
+      // Google Ads has no per-label true-cost breakdown, only per-asset_group. Using just this
+      // column's own label-split `cost` as the numerator against that shared, un-split
+      // denominator mechanically halves (or worse) the ratio for every member of the group, which
+      // was firing false "non-Shopping leakage" warnings for 似顔絵/名入れ even though their
+      // combined ratio was a healthy ~91%. Fix: sum product-card cost across every display AG that
+      // shares this raw AG, so the numerator and denominator describe the same real Ads entity.
+      const rawAg = RAW_AG_OF[ag] || ag;
+      const rawGroupCost = stats
+        .filter(x => (RAW_AG_OF[x.p.ag] || x.p.ag) === rawAg)
+        .reduce((s,x) => s + x.agg.cost, 0);
+      const shoppingRatio = trueCost > 0 ? (rawGroupCost / trueCost * 100) : null;
       // "商品N件" counts only items that actually ran (cost>0) within the selected period, not
       // every product ever historically tied to this AG -- `items` itself stays unfiltered so
       // zero-activity products still render as "期間内データなし" cards further down the column.
       const activeCount = items.filter(x => x.agg.cost > 0).length;
-      return { ag, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, shoppingRatio, activeCount };
+      return { ag, rawAg, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, shoppingRatio, activeCount };
     });
+    // How many display AGs share each raw AG -- drives the tooltip note below for 似顔絵/名入れ-
+    // style splits so it isn't hardcoded to those two names and stays correct if the account
+    // structure changes.
+    const rawAgMemberCount = {};
+    AG_ORDER.forEach(a => { const r = RAW_AG_OF[a] || a; rawAgMemberCount[r] = (rawAgMemberCount[r] || 0) + 1; });
     // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
     const shownAgGroups = agGroups
@@ -523,13 +545,23 @@
     const shoppingWarnEnd = LAST_IDX - 1;
     const shoppingWarnStart = Math.max(0, shoppingWarnEnd - 6);
     const shoppingRatioWarnings = [];
-    for (const warnAg of Object.keys(AG_COST)){
+    // Group by raw asset_group, not display AG: 似顔絵/名入れ share one raw AG and therefore one
+    // real trueCost, so checking them separately with a per-label numerator both double-processes
+    // the same true cost and mechanically halves each label's ratio -- see the same fix/rationale
+    // on the per-column shoppingRatio above (2026-08-23, funato-san verification).
+    const warnRawGroups = {};
+    for (const displayAg of Object.keys(AG_COST)){
+      const rawAg = RAW_AG_OF[displayAg] || displayAg;
+      (warnRawGroups[rawAg] = warnRawGroups[rawAg] || []).push(displayAg);
+    }
+    for (const [warnRawAg, displayAgs] of Object.entries(warnRawGroups)){
       let warnTrueCost = 0, warnCardCost = 0;
       for (let i = shoppingWarnStart; i <= shoppingWarnEnd; i++){
-        warnTrueCost += (AG_COST[warnAg] || [])[i] || 0;
+        // identical across every displayAgs member by construction (see RAW_AG_OF) -- take the first
+        warnTrueCost += (AG_COST[displayAgs[0]] || [])[i] || 0;
       }
       for (const p of products){
-        if (p.ag !== warnAg) continue;
+        if (!displayAgs.includes(p.ag)) continue;
         for (let i = shoppingWarnStart; i <= shoppingWarnEnd; i++){
           warnCardCost += p.cost[i] || 0;
         }
@@ -537,7 +569,7 @@
       if (warnTrueCost <= 0) continue;
       const warnRatio = warnCardCost / warnTrueCost * 100;
       if (warnRatio < SHOPPING_RATIO_FLOOR){
-        shoppingRatioWarnings.push({ ag: warnAg, ratio: warnRatio, trueCost: warnTrueCost });
+        shoppingRatioWarnings.push({ ag: displayAgs.join("・"), ratio: warnRatio, trueCost: warnTrueCost });
       }
     }
     if (shoppingRatioWarnings.length > 0){
@@ -629,9 +661,13 @@
       root.appendChild(empty);
     }
 
-    shownAgGroups.forEach(({ag, items, trueCost, trueCv, agRoas, shoppingRatio, activeCount}) => {
+    shownAgGroups.forEach(({ag, rawAg, items, trueCost, trueCv, agRoas, shoppingRatio, activeCount}) => {
       const col = document.createElement("div");
       col.className = "ag-col";
+
+      const sharesRawAg = (rawAgMemberCount[rawAg] || 1) > 1;
+      const shoppingRatioTitle = "商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている"
+        + (sharesRawAg ? "。このAGはGoogle広告上では他の列と同一アセットグループ（ラベル分割のみ）のため、分子はその全列合算の商品カード費用を使用" : "");
 
       const isEnabled = AG_STATUS[ag] === "ENABLED";
       const header = document.createElement("div");
@@ -643,7 +679,7 @@
           <span>費用 ${yen(trueCost)}</span>
           <span>CV ${trueCv.toFixed(1)}</span>
           <span>商品 ${activeCount}件</span>
-          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている">商品データ広告：${pct(shoppingRatio)}</span>
+          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="${shoppingRatioTitle}">商品データ広告：${pct(shoppingRatio)}</span>
         </div>
       `;
       col.appendChild(header);
@@ -688,7 +724,7 @@
 
     const foot = document.createElement("div");
     foot.className = "footnote";
-    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。`;
+    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。ベストセラー(似顔絵)／(名入れ)の「商品データ広告」比率は、両者がGoogle広告上は同一アセットグループのため、商品カード費用を両列合算した値を分母（asset_group実績）に対して計算しています。`;
     root.appendChild(foot);
   }
 
