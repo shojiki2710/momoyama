@@ -338,6 +338,9 @@
   const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
   const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
   const CAMPAIGN_CV = __CAMPAIGN_CV_JSON__;       // {family: [daily conversions]}
+  const AG_COST = __AG_COST_JSON__;     // {display AG name: [daily cost, aligned to DATES]} -- TRUE per-asset_group totals (every surface: Shopping/Search/Display/YouTube/..., not just shopping_performance_view)
+  const AG_VALUE = __AG_VALUE_JSON__;   // {display AG name: [daily conversion value]}
+  const AG_CV = __AG_CV_JSON__;         // {display AG name: [daily conversions]}
   const ACCOUNT_COST = __ACCOUNT_COST_JSON__;   // true account-wide daily ad cost, aligned to DATES (every campaign, not just classified spend)
   const ACCOUNT_VALUE = __ACCOUNT_VALUE_JSON__; // true account-wide daily conversion value, aligned to DATES
   const SHOP_SALES = __SHOP_SALES_JSON__;       // whole store's own daily revenue (every order, every channel), aligned to DATES
@@ -358,8 +361,10 @@
   }
 
   const LAST_IDX = DATES.length - 1;
-  let rangeStart = Math.max(0, DATES.length - DEFAULT_PRESET_DAYS);
-  let rangeEnd = LAST_IDX;
+  // Preset ranges exclude "today" (index LAST_IDX) to match the Google Ads UI's own "last N
+  // days" definition, which also excludes today. Confirmed with funato-san 2026-08-22.
+  let rangeEnd = LAST_IDX - 1;
+  let rangeStart = Math.max(0, rangeEnd - DEFAULT_PRESET_DAYS + 1);
   let activePresetDays = DEFAULT_PRESET_DAYS;
 
   function grade(roas){
@@ -423,12 +428,23 @@
       const cost = items.reduce((s,x)=>s+x.agg.cost,0);
       const cv = items.reduce((s,x)=>s+x.agg.cv,0);
       const value = items.reduce((s,x)=>s+x.agg.value,0);
-      const agRoas = cost > 0 ? (value/cost*100) : null;
+      // TRUE per-AG cost/CV/value/ROAS, from the asset_group resource (every surface the AG
+      // serves on -- Search/Display/YouTube/etc, not just Shopping; see generate_board.py's
+      // fetch_ag_daily_totals). Drives the header badge below. `cost`/`cv`/`value` above (product-
+      // card sums, shopping_performance_view only) stay unchanged as the column-visibility filter
+      // and the per-product breakdown -- the two totals can legitimately diverge (see footer note).
+      let trueCost = 0, trueCv = 0, trueValue = 0;
+      for (let i = rangeStart; i <= rangeEnd; i++){
+        trueCost += (AG_COST[ag] || [])[i] || 0;
+        trueCv += (AG_CV[ag] || [])[i] || 0;
+        trueValue += (AG_VALUE[ag] || [])[i] || 0;
+      }
+      const agRoas = trueCost > 0 ? (trueValue/trueCost*100) : null;
       // "商品N件" counts only items that actually ran (cost>0) within the selected period, not
       // every product ever historically tied to this AG -- `items` itself stays unfiltered so
       // zero-activity products still render as "期間内データなし" cards further down the column.
       const activeCount = items.filter(x => x.agg.cost > 0).length;
-      return { ag, items, cost, cv, value, agRoas, activeCount };
+      return { ag, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, activeCount };
     });
     // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
@@ -514,8 +530,8 @@
     periodBar.querySelectorAll(".period-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const days = parseInt(btn.dataset.days, 10);
-        rangeEnd = LAST_IDX;
-        rangeStart = Math.max(0, LAST_IDX - days + 1);
+        rangeEnd = LAST_IDX - 1;
+        rangeStart = Math.max(0, rangeEnd - days + 1);
         activePresetDays = days;
         renderBoard();
       });
@@ -572,7 +588,7 @@
       root.appendChild(empty);
     }
 
-    shownAgGroups.forEach(({ag, items, cost, cv, value, agRoas, activeCount}) => {
+    shownAgGroups.forEach(({ag, items, trueCost, trueCv, agRoas, activeCount}) => {
       const col = document.createElement("div");
       col.className = "ag-col";
 
@@ -583,8 +599,8 @@
         <div class="ag-name">${ag}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
         <div class="ag-metrics">
           <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
-          <span>費用 ${yen(cost)}</span>
-          <span>CV ${cv.toFixed(1)}</span>
+          <span>費用 ${yen(trueCost)}</span>
+          <span>CV ${trueCv.toFixed(1)}</span>
           <span>商品 ${activeCount}件</span>
         </div>
       `;
@@ -630,7 +646,7 @@
 
     const foot = document.createElement("div");
     foot.className = "footnote";
-    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。`;
+    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。`;
     root.appendChild(foot);
   }
 

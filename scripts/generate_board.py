@@ -115,6 +115,18 @@ LABEL_TO_DISPLAY_AG = {
     "best_seller_quickship": "即納・ベストセラー",
 }
 
+# display AG name -> raw Google Ads asset_group.name it corresponds to. ベストセラー(似顔絵) and
+# ベストセラー(名入れ) share the SAME raw asset group ("ベストセラー") -- the split is purely a
+# custom_label_0-based product grouping on the board, not a separate asset group in Google Ads --
+# so their true per-AG cost/CV/value/ROAS (see fetch_ag_daily_totals) are identical by
+# construction, both being that one raw AG's real totals.
+DISPLAY_TO_RAW_AG = {
+    display_ag: raw_ag
+    for raw_ag, labels in AG_TO_LABELS.items()
+    for display_ag in {LABEL_TO_DISPLAY_AG[label] for label in labels}
+}
+DISPLAY_TO_RAW_AG[SECOND_TEAM_DISPLAY_AG] = SECOND_TEAM_RAW_AG_NAME
+
 # Custom labels confirmed with ふなとさん (2026-08-20) to be real but deliberately NOT tied to any
 # AG -- excluded from the structure audit's "未対応カスタムラベル" warnings rather than treated
 # as an unrecognized gap. "excluded": products intentionally excluded from advertising entirely.
@@ -204,6 +216,19 @@ class DirectApiClient:
                 return self._ads.fetch_account_daily_totals(self._ads_client, customer_id, date_from, date_to)
             if fields == ("campaign", "date", "cost", "conversions", "conversions_value"):
                 return self._ads.fetch_campaign_daily_totals(self._ads_client, customer_id, date_from, date_to)
+            if fields == ("campaign", "asset_group_name", "date", "cost", "conversions", "conversions_value"):
+                rows = self._ads.fetch_ag_daily_totals(self._ads_client, customer_id, date_from, date_to)
+                return [
+                    {
+                        "campaign": r["campaign"],
+                        "asset_group_name": r["asset_group"],
+                        "date": r["date"],
+                        "cost": r["cost"],
+                        "conversions": r["conversions"],
+                        "conversions_value": r["conversions_value"],
+                    }
+                    for r in rows
+                ]
             if fields == ("campaign", "asset_group", "included", "custom_label_index", "custom_label_value"):
                 return self._ads.fetch_listing_group_filters(self._ads_client, customer_id)
 
@@ -247,6 +272,7 @@ class FixtureClient:
         ("google_ads", ("campaign", "date", "cost", "conversions", "conversions_value")): "step6_campaign_daily_totals.json",
         ("shopify", ("date", "total_sales")): "step5_shopify_daily_sales.json",
         ("google_ads", ("campaign", "asset_group", "included", "custom_label_index", "custom_label_value")): "step7_listing_group_filters.json",
+        ("google_ads", ("campaign", "asset_group_name", "date", "cost", "conversions", "conversions_value")): "step8_ag_daily_totals.json",
     }
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
@@ -579,6 +605,41 @@ def fetch_campaign_daily_totals(client, date_from, date_to):
     return totals
 
 
+def fetch_ag_daily_totals(client, date_from, date_to):
+    """{raw_asset_group_name: {date_str: {cost, cv, value}}}, TRUE per-asset-group totals across
+    every surface the AG serves on (Shopping, Search, Display, YouTube, ...), not just the
+    shopping_performance_view slice fetch_item_performance sees. Feeds the AG column heading ROAS
+    -- added 2026-08-22 after confirming live the previous product-card-sum badge understated
+    Second-Team's true ROAS by +41.5pt (263.1% true vs 304.6% product-card sum), since non-Shopping
+    surface spend/value has no item_id and never reaches shopping_performance_view. The product
+    cards themselves (per-product breakdown) stay shopping_performance_view-based and unchanged,
+    so the AG heading total and the sum of its cards can legitimately diverge (see the board's
+    footer note). Scoped to CAMPAIGN_KEYWORDS the same way fetch_ag_status is, so a paused
+    duplicate campaign reusing a live AG's raw name (see fetch_ag_status's docstring) can't leak
+    its rows in here either."""
+    rows = client.get_data(
+        "google_ads",
+        ["campaign", "asset_group_name", "date", "cost", "conversions", "conversions_value"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    totals = {}
+    for row in rows:
+        campaign = row.get("campaign") or ""
+        if not any(k in campaign for k in CAMPAIGN_KEYWORDS):
+            continue
+        ag_name = row.get("asset_group_name")
+        date = row.get("date")
+        if not ag_name or not date:
+            continue
+        day = totals.setdefault(ag_name, {}).setdefault(date, {"cost": 0.0, "cv": 0.0, "value": 0.0})
+        day["cost"] += float(row.get("cost") or 0)
+        day["cv"] += float(row.get("conversions") or 0)
+        day["value"] += float(row.get("conversions_value") or 0)
+    return totals
+
+
 def fetch_shopify_daily_sales(client, date_from, date_to):
     """{date_str: total_sales}, the whole store's own revenue (every order, every channel --
     not just Google Ads-attributed). Feeds 売上高広告費率 (ad cost / total store sales), added
@@ -666,6 +727,7 @@ def build_ag_status(raw_ag_status):
 def render_html(
     products, date_list, raw_ag_status, structure_warnings, generated_at,
     account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
+    ag_cost, ag_value, ag_cv,
 ):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
@@ -693,6 +755,9 @@ def render_html(
     html = html.replace("__CAMPAIGN_COST_JSON__", js_json(campaign_cost))
     html = html.replace("__CAMPAIGN_VALUE_JSON__", js_json(campaign_value))
     html = html.replace("__CAMPAIGN_CV_JSON__", js_json(campaign_cv))
+    html = html.replace("__AG_COST_JSON__", js_json(ag_cost))
+    html = html.replace("__AG_VALUE_JSON__", js_json(ag_value))
+    html = html.replace("__AG_CV_JSON__", js_json(ag_cv))
     html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
@@ -756,6 +821,19 @@ def main():
         family: [round(campaign_daily_totals[family].get(d, {}).get("cv", 0), 4) for d in date_list]
         for family in CAMPAIGN_DISPLAY_ORDER
     }
+    ag_daily_totals = fetch_ag_daily_totals(client, str(date_from), str(date_to))
+    ag_cost = {
+        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("cost", 0), 2) for d in date_list]
+        for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
+    }
+    ag_value = {
+        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("value", 0), 2) for d in date_list]
+        for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
+    }
+    ag_cv = {
+        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("cv", 0), 4) for d in date_list]
+        for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
+    }
 
     if not products:
         sys.exit(
@@ -774,6 +852,7 @@ def main():
     html = render_html(
         products, date_list, raw_ag_status, structure_warnings, generated_at,
         account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
+        ag_cost, ag_value, ag_cv,
     )
 
     active_count = sum(1 for v in raw_ag_status.values() if v)

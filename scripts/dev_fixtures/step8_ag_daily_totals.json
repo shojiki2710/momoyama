@@ -1,0 +1,786 @@
+[
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-22",
+    "cost": 12085.87,
+    "conversions": 4.56,
+    "conversions_value": 49210.36,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-22",
+    "cost": 3769.47,
+    "conversions": 1.37,
+    "conversions_value": 4849.81,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 1340.71,
+    "conversions": 0.43,
+    "conversions_value": 2338.96,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 1340.71,
+    "conversions": 0.43,
+    "conversions_value": 2338.96,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 1340.71,
+    "conversions": 0.43,
+    "conversions_value": 2338.96,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 1340.71,
+    "conversions": 0.43,
+    "conversions_value": 2338.96,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-22",
+    "cost": 1340.71,
+    "conversions": 0.43,
+    "conversions_value": 2338.96,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-23",
+    "cost": 9114.46,
+    "conversions": 3.42,
+    "conversions_value": 36588.09,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-23",
+    "cost": 2852.47,
+    "conversions": 1.05,
+    "conversions_value": 4034.14,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 964.48,
+    "conversions": 0.346,
+    "conversions_value": 1542.91,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 964.48,
+    "conversions": 0.346,
+    "conversions_value": 1542.91,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 964.48,
+    "conversions": 0.346,
+    "conversions_value": 1542.91,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 964.48,
+    "conversions": 0.346,
+    "conversions_value": 1542.91,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-23",
+    "cost": 964.48,
+    "conversions": 0.346,
+    "conversions_value": 1542.91,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-24",
+    "cost": 10217.13,
+    "conversions": 4.28,
+    "conversions_value": 44664.93,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-24",
+    "cost": 3360.91,
+    "conversions": 1.24,
+    "conversions_value": 3768.7,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 1454.43,
+    "conversions": 0.514,
+    "conversions_value": 2817.28,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 1454.43,
+    "conversions": 0.514,
+    "conversions_value": 2817.28,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 1454.43,
+    "conversions": 0.514,
+    "conversions_value": 2817.28,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 1454.43,
+    "conversions": 0.514,
+    "conversions_value": 2817.28,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-24",
+    "cost": 1454.43,
+    "conversions": 0.514,
+    "conversions_value": 2817.28,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-25",
+    "cost": 11566.07,
+    "conversions": 3.86,
+    "conversions_value": 47868.21,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-25",
+    "cost": 2705.34,
+    "conversions": 1.18,
+    "conversions_value": 3005.23,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 1216.33,
+    "conversions": 0.486,
+    "conversions_value": 1794.54,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 1216.33,
+    "conversions": 0.486,
+    "conversions_value": 1794.54,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 1216.33,
+    "conversions": 0.486,
+    "conversions_value": 1794.54,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 1216.33,
+    "conversions": 0.486,
+    "conversions_value": 1794.54,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-25",
+    "cost": 1216.33,
+    "conversions": 0.486,
+    "conversions_value": 1794.54,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-26",
+    "cost": 15680.35,
+    "conversions": 6.85,
+    "conversions_value": 57865.69,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-26",
+    "cost": 4049.98,
+    "conversions": 1.35,
+    "conversions_value": 5208.01,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 1852.2,
+    "conversions": 0.64,
+    "conversions_value": 3472.21,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 1852.2,
+    "conversions": 0.64,
+    "conversions_value": 3472.21,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 1852.2,
+    "conversions": 0.64,
+    "conversions_value": 3472.21,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 1852.2,
+    "conversions": 0.64,
+    "conversions_value": 3472.21,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-26",
+    "cost": 1852.2,
+    "conversions": 0.64,
+    "conversions_value": 3472.21,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-27",
+    "cost": 13068.25,
+    "conversions": 5.83,
+    "conversions_value": 54473.04,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-27",
+    "cost": 3543.5,
+    "conversions": 1.11,
+    "conversions_value": 4831.05,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 1399.35,
+    "conversions": 0.442,
+    "conversions_value": 2220.58,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 1399.35,
+    "conversions": 0.442,
+    "conversions_value": 2220.58,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 1399.35,
+    "conversions": 0.442,
+    "conversions_value": 2220.58,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 1399.35,
+    "conversions": 0.442,
+    "conversions_value": 2220.58,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-27",
+    "cost": 1399.35,
+    "conversions": 0.442,
+    "conversions_value": 2220.58,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-28",
+    "cost": 15475.92,
+    "conversions": 5.42,
+    "conversions_value": 71109.22,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-28",
+    "cost": 4047.25,
+    "conversions": 1.44,
+    "conversions_value": 5589.44,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 1387.56,
+    "conversions": 0.588,
+    "conversions_value": 2167.55,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 1387.56,
+    "conversions": 0.588,
+    "conversions_value": 2167.55,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 1387.56,
+    "conversions": 0.588,
+    "conversions_value": 2167.55,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 1387.56,
+    "conversions": 0.588,
+    "conversions_value": 2167.55,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-28",
+    "cost": 1387.56,
+    "conversions": 0.588,
+    "conversions_value": 2167.55,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-29",
+    "cost": 10651.9,
+    "conversions": 4.81,
+    "conversions_value": 37114.08,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-29",
+    "cost": 3349.1,
+    "conversions": 1.23,
+    "conversions_value": 4223.74,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 1369.52,
+    "conversions": 0.606,
+    "conversions_value": 2248.92,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 1369.52,
+    "conversions": 0.606,
+    "conversions_value": 2248.92,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 1369.52,
+    "conversions": 0.606,
+    "conversions_value": 2248.92,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 1369.52,
+    "conversions": 0.606,
+    "conversions_value": 2248.92,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-29",
+    "cost": 1369.52,
+    "conversions": 0.606,
+    "conversions_value": 2248.92,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-30",
+    "cost": 14889.61,
+    "conversions": 6.23,
+    "conversions_value": 65764.01,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-30",
+    "cost": 3035.26,
+    "conversions": 1.24,
+    "conversions_value": 3602.22,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 1603.85,
+    "conversions": 0.72,
+    "conversions_value": 2702.0,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 1603.85,
+    "conversions": 0.72,
+    "conversions_value": 2702.0,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 1603.85,
+    "conversions": 0.72,
+    "conversions_value": 2702.0,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 1603.85,
+    "conversions": 0.72,
+    "conversions_value": 2702.0,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-30",
+    "cost": 1603.85,
+    "conversions": 0.72,
+    "conversions_value": 2702.0,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-07-31",
+    "cost": 15756.76,
+    "conversions": 5.91,
+    "conversions_value": 61087.53,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-07-31",
+    "cost": 3274.92,
+    "conversions": 1.24,
+    "conversions_value": 4422.74,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 1627.94,
+    "conversions": 0.536,
+    "conversions_value": 2576.36,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 1627.94,
+    "conversions": 0.536,
+    "conversions_value": 2576.36,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 1627.94,
+    "conversions": 0.536,
+    "conversions_value": 2576.36,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 1627.94,
+    "conversions": 0.536,
+    "conversions_value": 2576.36,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-07-31",
+    "cost": 1627.94,
+    "conversions": 0.536,
+    "conversions_value": 2576.36,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-01",
+    "cost": 8405.26,
+    "conversions": 3.09,
+    "conversions_value": 31932.45,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-01",
+    "cost": 2980.67,
+    "conversions": 1.05,
+    "conversions_value": 4174.83,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 926.62,
+    "conversions": 0.344,
+    "conversions_value": 1455.41,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 926.62,
+    "conversions": 0.344,
+    "conversions_value": 1455.41,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 926.62,
+    "conversions": 0.344,
+    "conversions_value": 1455.41,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 926.62,
+    "conversions": 0.344,
+    "conversions_value": 1455.41,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-01",
+    "cost": 926.62,
+    "conversions": 0.344,
+    "conversions_value": 1455.41,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-02",
+    "cost": 9521.23,
+    "conversions": 3.33,
+    "conversions_value": 33056.49,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-02",
+    "cost": 3212.58,
+    "conversions": 1.21,
+    "conversions_value": 3772.51,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 1200.89,
+    "conversions": 0.484,
+    "conversions_value": 2009.31,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 1200.89,
+    "conversions": 0.484,
+    "conversions_value": 2009.31,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 1200.89,
+    "conversions": 0.484,
+    "conversions_value": 2009.31,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 1200.89,
+    "conversions": 0.484,
+    "conversions_value": 2009.31,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-02",
+    "cost": 1200.89,
+    "conversions": 0.484,
+    "conversions_value": 2009.31,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-03",
+    "cost": 9822.23,
+    "conversions": 3.07,
+    "conversions_value": 42022.18,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-03",
+    "cost": 2625.89,
+    "conversions": 0.82,
+    "conversions_value": 3560.84,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 1045.23,
+    "conversions": 0.344,
+    "conversions_value": 1734.65,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 1045.23,
+    "conversions": 0.344,
+    "conversions_value": 1734.65,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 1045.23,
+    "conversions": 0.344,
+    "conversions_value": 1734.65,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 1045.23,
+    "conversions": 0.344,
+    "conversions_value": 1734.65,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-03",
+    "cost": 1045.23,
+    "conversions": 0.344,
+    "conversions_value": 1734.65,
+    "asset_group_name": "結婚記念日"
+  },
+  {
+    "campaign": "2026.4.28 P-MAX Best-Selling",
+    "date": "2026-08-04",
+    "cost": 18434.12,
+    "conversions": 6.34,
+    "conversions_value": 68644.13,
+    "asset_group_name": "ベストセラー"
+  },
+  {
+    "campaign": "2026.8.1 P-MAX Second-Team",
+    "date": "2026-08-04",
+    "cost": 6278.61,
+    "conversions": 2.5,
+    "conversions_value": 8905.14,
+    "asset_group_name": "２軍"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 2071.25,
+    "conversions": 0.852,
+    "conversions_value": 3927.68,
+    "asset_group_name": "還暦祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 2071.25,
+    "conversions": 0.852,
+    "conversions_value": 3927.68,
+    "asset_group_name": "結婚祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 2071.25,
+    "conversions": 0.852,
+    "conversions_value": 3927.68,
+    "asset_group_name": "誕生日祝い"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 2071.25,
+    "conversions": 0.852,
+    "conversions_value": 3927.68,
+    "asset_group_name": "すぐ届く"
+  },
+  {
+    "campaign": "2024.3.1 P-MAX Gift-Scene",
+    "date": "2026-08-04",
+    "cost": 2071.25,
+    "conversions": 0.852,
+    "conversions_value": 3927.68,
+    "asset_group_name": "結婚記念日"
+  }
+]

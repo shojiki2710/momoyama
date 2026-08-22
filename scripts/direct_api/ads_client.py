@@ -187,6 +187,42 @@ def fetch_campaign_daily_totals(client, customer_id, date_from, date_to):
     ]
 
 
+def fetch_ag_daily_totals(client, customer_id, date_from, date_to):
+    """TRUE per-asset-group daily cost/conversions/conversions_value -- every surface the AG
+    serves on (Shopping, Search, Display, YouTube, ...), not just the shopping_performance_view
+    slice fetch_item_performance sees. Added 2026-08-22 after confirming live that the AG column
+    heading ROAS -- previously just the sum of that AG's product cards -- understated Second-
+    Team's true ROAS by +41.5pt (263.1% true vs 304.6% product-card sum) because non-Shopping
+    surface spend/value has no item_id and so never reaches shopping_performance_view. The
+    `asset_group` resource aggregates per asset group per day, independent of any product/item_id
+    join -- same resource fetch_ag_status already queries for the status badge, just with
+    segments.date + metrics added."""
+    query = f"""
+        SELECT
+          campaign.name,
+          asset_group.name,
+          segments.date,
+          metrics.cost_micros,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM asset_group
+        WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
+          AND segments.date BETWEEN '{date_from}' AND '{date_to}'
+    """
+    rows = _run_search(client, customer_id, query)
+    return [
+        {
+            "campaign": row.campaign.name,
+            "asset_group": row.asset_group.name,
+            "date": row.segments.date,
+            "cost": row.metrics.cost_micros / 1_000_000,
+            "conversions": row.metrics.conversions,
+            "conversions_value": row.metrics.conversions_value,
+        }
+        for row in rows
+    ]
+
+
 def fetch_item_performance(client, customer_id, date_from, date_to):
     """Daily per-product performance across all campaigns -- Windsor's item_id-level step.
     Cost comes back as cost_micros; divide by 1_000_000 here so callers get real currency units."""
