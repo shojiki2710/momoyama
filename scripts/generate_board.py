@@ -741,11 +741,23 @@ def render_html(
     ag_order = [ag for ag in AG_DISPLAY_ORDER if ag in present_ags]
     ag_order += sorted(present_ags - set(ag_order))
     ag_status = build_ag_status(raw_ag_status)
-    # display AG name -> raw Google Ads asset_group.name. Multiple display AGs can share one raw
-    # AG (ベストセラー(似顔絵)/(名入れ) are both really the single "ベストセラー" AG -- see
-    # DISPLAY_TO_RAW_AG above). Sent to the template so it can avoid mis-splitting the 商品データ
-    # 広告比率 denominator/numerator across those shared columns (2026-08-23 fix).
-    raw_ag_of = {ag: DISPLAY_TO_RAW_AG.get(ag, ag) for ag in ag_order}
+
+    # Groups display AGs by the raw Google Ads asset_group they actually share, so the board can
+    # render one true AG card per real asset group -- with a nested リスティンググループ subsection
+    # per display AG when 2+ of them share one raw AG (currently only ベストセラー(似顔絵)/(名入れ),
+    # which are the SAME raw AG split by custom_label_0, not two real asset groups; see
+    # DISPLAY_TO_RAW_AG). Added 2026-08-22 so the UI stops presenting a Merchant Center label split
+    # as if it were an independent AG -- ふなとさん confirmed the current flat layout was the direct
+    # cause of the "why do these two columns show identical numbers" confusion.
+    raw_ag_groups = []
+    raw_to_group_idx = {}
+    for display_ag in ag_order:
+        raw_ag = DISPLAY_TO_RAW_AG.get(display_ag, display_ag)
+        if raw_ag not in raw_to_group_idx:
+            raw_to_group_idx[raw_ag] = len(raw_ag_groups)
+            raw_ag_groups.append({"raw": raw_ag, "displays": []})
+        sublabel = display_ag.replace(raw_ag, "").strip("()") or None
+        raw_ag_groups[raw_to_group_idx[raw_ag]]["displays"].append({"ag": display_ag, "sublabel": sublabel})
 
     def js_string_escape(s):
         return s.replace("\\", "\\\\").replace('"', '\\"')
@@ -759,7 +771,7 @@ def render_html(
     html = html.replace("__PRODUCTS_JSON__", js_json(products))
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
-    html = html.replace("__RAW_AG_OF_JSON__", js_json(raw_ag_of))
+    html = html.replace("__RAW_AG_GROUPS_JSON__", js_json(raw_ag_groups))
     html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
     html = html.replace("__ACCOUNT_COST_JSON__", js_json(account_cost))
     html = html.replace("__ACCOUNT_VALUE_JSON__", js_json(account_value))

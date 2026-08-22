@@ -188,6 +188,13 @@
     flex-direction: column;
     gap: 9px;
   }
+  .ag-col-wide { grid-column: span 2; }
+  .listing-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (max-width: 600px) { .listing-groups { grid-template-columns: 1fr; } }
+  .listing-group { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .listing-group-label { font-size: 10.5px; color: #8a8a80; }
+  .listing-group-name { font-weight: 600; font-size: 13px; margin-top: -4px; }
+  .listing-group-count { font-size: 10.5px; color: #6b6b6b; margin-top: -4px; }
   .ag-header {
     padding: 4px 4px 10px 4px;
     border-bottom: 1px solid rgba(0,0,0,0.08);
@@ -335,10 +342,8 @@
   const products = __PRODUCTS_JSON__;         // each: {ag, title, id, img, cost:[], cv:[], value:[]} aligned to DATES
   const AG_ORDER = __AG_ORDER_JSON__;
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
-  const RAW_AG_OF = __RAW_AG_OF_JSON__;        // display AG name -> raw Google Ads asset_group.name. Multiple display AGs can share
-                                                // one raw AG (ベストセラー(似顔絵)/(名入れ) are both really the single "ベストセラー" AG,
-                                                // split only by Merchant Center custom_label_0) -- used below so 商品データ広告比率
-                                                // doesn't mis-split a shared asset_group-level denominator across those columns.
+  const RAW_AG_GROUPS = __RAW_AG_GROUPS_JSON__; // [{raw, displays:[{ag, sublabel}]}] -- groups display AGs sharing one real Google Ads asset group (see generate_board.py)
+  const RAW_AG_OF = Object.fromEntries(RAW_AG_GROUPS.flatMap(g => g.displays.map(d => [d.ag, g.raw]))); // display AG name -> raw Google Ads asset_group.name, derived from RAW_AG_GROUPS above
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
   const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
   const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
@@ -473,18 +478,21 @@
       const activeCount = items.filter(x => x.agg.cost > 0).length;
       return { ag, rawAg, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, shoppingRatio, activeCount };
     });
-    // How many display AGs share each raw AG -- drives the tooltip note below for 似顔絵/名入れ-
-    // style splits so it isn't hardcoded to those two names and stays correct if the account
-    // structure changes.
-    const rawAgMemberCount = {};
-    AG_ORDER.forEach(a => { const r = RAW_AG_OF[a] || a; rawAgMemberCount[r] = (rawAgMemberCount[r] || 0) + 1; });
-    // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
-    // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
-    const shownAgGroups = agGroups
-      .filter(g => g.cost > 0)
-      .sort((a, b) => (AG_STATUS[b.ag] === "ENABLED") - (AG_STATUS[a.ag] === "ENABLED"));
+    const agGroupsByAg = Object.fromEntries(agGroups.map(g => [g.ag, g]));
 
-    const periodText = `${startDate}〜${endDate}／表示中${shownAgGroups.length}AG（${shownAgGroups.map(g=>g.ag).join("・") || "該当なし"}）・全${products.length}商品`;
+    // Groups display AGs by the real Google Ads asset group they share (see generate_board.py's
+    // raw_ag_groups) -- most groups have exactly one display AG (unchanged rendering below), but
+    // ベストセラー(似顔絵)/(名入れ) share ONE real asset group, so they render as a single true-AG
+    // card with two リスティンググループ subsections instead of two duplicate-looking AG cards.
+    // Currently-active groups first (left-to-right, top of the grid), paused ones after -- stable
+    // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
+    const shownRawGroups = RAW_AG_GROUPS
+      .map(g => ({ raw: g.raw, displays: g.displays.filter(d => (agGroupsByAg[d.ag]?.cost || 0) > 0) }))
+      .filter(g => g.displays.length > 0)
+      .sort((a, b) => (AG_STATUS[b.displays[0].ag] === "ENABLED") - (AG_STATUS[a.displays[0].ag] === "ENABLED"));
+
+    const shownAgNames = shownRawGroups.flatMap(g => g.displays.map(d => d.ag));
+    const periodText = `${startDate}〜${endDate}／表示中${shownAgNames.length}AG（${shownAgNames.join("・") || "該当なし"}）・全${products.length}商品`;
 
     // Campaign-level tier, between the account-wide total and the per-AG columns: TRUE per-
     // campaign totals from CAMPAIGN_COST/CAMPAIGN_VALUE/CAMPAIGN_CV (every product actually
@@ -654,39 +662,14 @@
     const grid = document.createElement("div");
     grid.className = "board-grid";
 
-    if (shownAgGroups.length === 0){
+    if (shownRawGroups.length === 0){
       const empty = document.createElement("div");
       empty.className = "notice-bar";
       empty.innerHTML = "選択した期間には実績のあるAGがありません。期間を広げてお試しください。";
       root.appendChild(empty);
     }
 
-    shownAgGroups.forEach(({ag, rawAg, items, trueCost, trueCv, agRoas, shoppingRatio, activeCount}) => {
-      const col = document.createElement("div");
-      col.className = "ag-col";
-
-      const sharesRawAg = (rawAgMemberCount[rawAg] || 1) > 1;
-      const shoppingRatioTitle = "商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている"
-        + (sharesRawAg ? "。このAGはGoogle広告上では他の列と同一アセットグループ（ラベル分割のみ）のため、分子はその全列合算の商品カード費用を使用" : "");
-
-      const isEnabled = AG_STATUS[ag] === "ENABLED";
-      const header = document.createElement("div");
-      header.className = "ag-header";
-      header.innerHTML = `
-        <div class="ag-name">${ag}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
-        <div class="ag-metrics">
-          <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
-          <span>費用 ${yen(trueCost)}</span>
-          <span>CV ${trueCv.toFixed(1)}</span>
-          <span>商品 ${activeCount}件</span>
-          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="${shoppingRatioTitle}">商品データ広告：${pct(shoppingRatio)}</span>
-        </div>
-      `;
-      col.appendChild(header);
-
-      const cardsWrap = document.createElement("div");
-      cardsWrap.className = "ag-cards";
-
+    function renderItemCards(container, items){
       items.forEach(({p, agg}) => {
         const card = document.createElement("div");
         card.className = "card " + grade(agg.roas);
@@ -713,10 +696,74 @@
             </div>
           </div>
         `;
-        cardsWrap.appendChild(card);
+        container.appendChild(card);
       });
+    }
 
-      col.appendChild(cardsWrap);
+    function agHeaderHtml(name, isEnabled, trueCost, trueCv, agRoas, shoppingRatio, extraMetric){
+      return `
+        <div class="ag-name">${name}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
+        <div class="ag-metrics">
+          <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
+          <span>費用 ${yen(trueCost)}</span>
+          <span>CV ${trueCv.toFixed(1)}</span>
+          ${extraMetric}
+          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている">商品データ広告：${pct(shoppingRatio)}</span>
+        </div>
+      `;
+    }
+
+    shownRawGroups.forEach(({ raw, displays }) => {
+      const col = document.createElement("div");
+
+      if (displays.length === 1){
+        // Common case: this raw AG has exactly one display column -- unchanged from before.
+        const g = agGroupsByAg[displays[0].ag];
+        col.className = "ag-col";
+        const isEnabled = AG_STATUS[g.ag] === "ENABLED";
+        const header = document.createElement("div");
+        header.className = "ag-header";
+        header.innerHTML = agHeaderHtml(g.ag, isEnabled, g.trueCost, g.trueCv, g.agRoas, g.shoppingRatio, `<span>商品 ${g.activeCount}件</span>`);
+        col.appendChild(header);
+
+        const cardsWrap = document.createElement("div");
+        cardsWrap.className = "ag-cards";
+        renderItemCards(cardsWrap, g.items);
+        col.appendChild(cardsWrap);
+      } else {
+        // Multiple display AGs share ONE real Google Ads asset group (currently only ベストセラー's
+        // 似顔絵/名入れ split) -- one outer card carries the true AG-level badges (identical across
+        // the shared displays by construction, see agGroups above), broken into per-リスティング
+        // グループ subsections below for the product-level breakdown. Replaces what used to be
+        // duplicate-looking AG cards with identical numbers (2026-08-22, ふなとさん確認).
+        col.className = "ag-col ag-col-wide";
+        const first = agGroupsByAg[displays[0].ag];
+        const isEnabled = AG_STATUS[displays[0].ag] === "ENABLED";
+        const header = document.createElement("div");
+        header.className = "ag-header";
+        header.innerHTML = agHeaderHtml(raw, isEnabled, first.trueCost, first.trueCv, first.agRoas, first.shoppingRatio, "");
+        col.appendChild(header);
+
+        const listingGroups = document.createElement("div");
+        listingGroups.className = "listing-groups";
+        displays.forEach(({ ag, sublabel }) => {
+          const g = agGroupsByAg[ag];
+          const lg = document.createElement("div");
+          lg.className = "listing-group";
+          lg.innerHTML = `
+            <div class="listing-group-label">リスティンググループ</div>
+            <div class="listing-group-name">${sublabel || ag}</div>
+            <div class="listing-group-count">商品 ${g.activeCount}件</div>
+          `;
+          const lgCards = document.createElement("div");
+          lgCards.className = "ag-cards";
+          renderItemCards(lgCards, g.items);
+          lg.appendChild(lgCards);
+          listingGroups.appendChild(lg);
+        });
+        col.appendChild(listingGroups);
+      }
+
       grid.appendChild(col);
     });
 
