@@ -217,6 +217,7 @@
   .ag-status-on { background: rgba(46,158,91,0.13); color: #227a45; }
   .ag-status-off { background: rgba(0,0,0,0.06); color: #7a7a72; }
   .ag-metrics { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: #6b6b6b; flex-wrap: wrap; white-space: nowrap; }
+  .metric-warn { color: #d64545; font-weight: 600; }
   .roas-badge {
     display: inline-block;
     padding: 2px 9px;
@@ -348,6 +349,7 @@
   const GENERATED_AT = "__GENERATED_AT__";
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
+  const SHOPPING_RATIO_FLOOR = __SHOPPING_RATIO_FLOOR__; // below this, non-Shopping surfaces (Discover/Display/YouTube) are eating a concerning share of an AG's true spend -- see the shopping-ratio audit banner
   const DEFAULT_PRESET_DAYS = __DEFAULT_PRESET_DAYS__;
   const STALE_THRESHOLD_HOURS = 30; // daily updates run ~24h apart; flag if it's been noticeably longer
 
@@ -440,11 +442,19 @@
         trueValue += (AG_VALUE[ag] || [])[i] || 0;
       }
       const agRoas = trueCost > 0 ? (trueValue/trueCost*100) : null;
+      // How much of this AG's TRUE spend actually landed on Shopping surfaces (item_id-attributed,
+      // shopping_performance_view) vs everywhere else PMax can serve (Search/Display/YouTube/
+      // Discover/...). Added 2026-08-22: PMax gives no direct placement control, so a falling
+      // shopping ratio is the earliest visible symptom of the same non-Shopping-surface takeover
+      // that forced Gift-Scene's retirement (Discover clicks grew ~740x there before anyone
+      // noticed) -- see the shopping-ratio audit banner below for the fixed-window early-warning
+      // check on this same signal.
+      const shoppingRatio = trueCost > 0 ? (cost / trueCost * 100) : null;
       // "商品N件" counts only items that actually ran (cost>0) within the selected period, not
       // every product ever historically tied to this AG -- `items` itself stays unfiltered so
       // zero-activity products still render as "期間内データなし" cards further down the column.
       const activeCount = items.filter(x => x.agg.cost > 0).length;
-      return { ag, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, activeCount };
+      return { ag, items, cost, cv, value, trueCost, trueCv, trueValue, agRoas, shoppingRatio, activeCount };
     });
     // Currently-active AGs first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
@@ -504,6 +514,37 @@
       audit.className = "audit-bar";
       audit.innerHTML = `⚠️ このボードが認識していないアカウント構造が見つかりました。表示に反映されていない可能性があります：<ul>${STRUCTURE_WARNINGS.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`;
       root.appendChild(audit);
+    }
+
+    // Fixed 直近7日（当日を除く、Task 1と同じ定義）ウィンドウでのショッピング比率早期警告。
+    // ユーザーが今どの期間ボタンを選んでいるかに関わらず常にこの固定ウィンドウでチェックする --
+    // Gift-Sceneの前例（Discoverクリックが約740倍に膨らむまで誰も気づかなかった）を踏まえ、
+    // 表示期間の選び方に依存せず毎回自動で兆候を拾うのが狙い（2026-08-22、ふなとさんと確定）。
+    const shoppingWarnEnd = LAST_IDX - 1;
+    const shoppingWarnStart = Math.max(0, shoppingWarnEnd - 6);
+    const shoppingRatioWarnings = [];
+    for (const warnAg of Object.keys(AG_COST)){
+      let warnTrueCost = 0, warnCardCost = 0;
+      for (let i = shoppingWarnStart; i <= shoppingWarnEnd; i++){
+        warnTrueCost += (AG_COST[warnAg] || [])[i] || 0;
+      }
+      for (const p of products){
+        if (p.ag !== warnAg) continue;
+        for (let i = shoppingWarnStart; i <= shoppingWarnEnd; i++){
+          warnCardCost += p.cost[i] || 0;
+        }
+      }
+      if (warnTrueCost <= 0) continue;
+      const warnRatio = warnCardCost / warnTrueCost * 100;
+      if (warnRatio < SHOPPING_RATIO_FLOOR){
+        shoppingRatioWarnings.push({ ag: warnAg, ratio: warnRatio, trueCost: warnTrueCost });
+      }
+    }
+    if (shoppingRatioWarnings.length > 0){
+      const shopAudit = document.createElement("div");
+      shopAudit.className = "audit-bar";
+      shopAudit.innerHTML = `⚠️ 直近7日間（${DATES[shoppingWarnStart]}〜${DATES[shoppingWarnEnd]}）でショッピング比率が${SHOPPING_RATIO_FLOOR}%を下回っているAGがあります。Search/Display/YouTube/Discover等の非ショッピング面への流出が拡大している可能性があります：<ul>${shoppingRatioWarnings.map(w => `<li>${w.ag}：ショッピング比率${pct(w.ratio)}（直近7日の真の費用${yen(w.trueCost)}）</li>`).join("")}</ul>`;
+      root.appendChild(shopAudit);
     }
 
     const notice = document.createElement("div");
@@ -588,7 +629,7 @@
       root.appendChild(empty);
     }
 
-    shownAgGroups.forEach(({ag, items, trueCost, trueCv, agRoas, activeCount}) => {
+    shownAgGroups.forEach(({ag, items, trueCost, trueCv, agRoas, shoppingRatio, activeCount}) => {
       const col = document.createElement("div");
       col.className = "ag-col";
 
@@ -602,6 +643,7 @@
           <span>費用 ${yen(trueCost)}</span>
           <span>CV ${trueCv.toFixed(1)}</span>
           <span>商品 ${activeCount}件</span>
+          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている">商品データ広告：${pct(shoppingRatio)}</span>
         </div>
       `;
       col.appendChild(header);

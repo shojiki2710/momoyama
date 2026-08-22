@@ -162,6 +162,12 @@ def campaign_family_of(campaign_name):
 ROAS_GOOD = 400
 ROAS_MID = 300
 
+# AG-level ショッピング比率（商品カード合計費用 ÷ asset_groupの真の費用）の下限値。これを下回ると
+# Discover/Display/YouTube等の非ショッピング面への流出が大きいとみなし警告する。2026-08-22、
+# Gift-Sceneのdiscover暴走（クリック約740倍・CVR0.09%まで悪化）を踏まえ、同種の兆候を早期検知する
+# ための閾値としてふなとさんと確定。
+SHOPPING_RATIO_FLOOR = 80
+
 
 def normalize_label(label):
     if not label:
@@ -762,6 +768,7 @@ def render_html(
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
     html = html.replace("__ROAS_MID__", str(ROAS_MID))
+    html = html.replace("__SHOPPING_RATIO_FLOOR__", str(SHOPPING_RATIO_FLOOR))
     html = html.replace("__DEFAULT_PRESET_DAYS__", str(DEFAULT_PRESET_DAYS))
     return html
 
