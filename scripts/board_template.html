@@ -53,27 +53,34 @@
   }
   .hero-secondary-label { opacity: 0.7; margin-right: 7px; }
   .hero-secondary-value { font-weight: 700; font-size: 16px; }
-  .campaign-bar {
+  /* CP zone: nests every AG column that really belongs to a campaign INSIDE that campaign's own
+     colored container, instead of an independent campaign summary row sitting on top of an
+     unrelated AG grid (the previous layout: their left-to-right order lined up by coincidence
+     only, which visibly misled -- 即納・ベストセラー, really under Best-Selling, rendered directly
+     below the unrelated Second-Team card). Border/background reuse the same ROAS grade colors as
+     everywhere else on the board (g-good/g-mid/g-bad/g-none) instead of inventing a second,
+     per-campaign-name color scheme, so the accent means the same thing everywhere. */
+  .zone {
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 16px;
+    border: 1.5px solid transparent;
+  }
+  .zone.g-good { border-color: rgba(46,158,91,0.35); background: rgba(46,158,91,0.04); }
+  .zone.g-mid  { border-color: rgba(217,154,31,0.35); background: rgba(217,154,31,0.04); }
+  .zone.g-bad  { border-color: rgba(214,69,69,0.35); background: rgba(214,69,69,0.045); }
+  .zone.g-none { border-color: rgba(0,0,0,0.12); background: rgba(0,0,0,0.015); }
+  .zone-header {
     display: flex;
+    align-items: baseline;
     gap: 10px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed rgba(0,0,0,0.12);
   }
-  .campaign-card {
-    flex: 1;
-    min-width: 190px;
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 12px 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.07);
-    border-left: 4px solid transparent;
-  }
-  .campaign-card.g-good { border-left-color: #2e9e5b; background: rgba(46,158,91,0.05); }
-  .campaign-card.g-mid  { border-left-color: #d99a1f; background: rgba(217,154,31,0.05); }
-  .campaign-card.g-bad  { border-left-color: #d64545; background: rgba(214,69,69,0.06); }
-  .campaign-card.g-none { border-left-color: #adaba3; background: rgba(0,0,0,0.02); }
-  .campaign-name { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; }
-  .campaign-metrics { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #6b6b6b; flex-wrap: wrap; }
+  .zone-title { font-weight: 700; font-size: 14.5px; }
+  .zone-metrics { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #6b6b6b; flex-wrap: wrap; }
   .notice-bar {
     font-size: 11px;
     color: #4a6b3a;
@@ -192,8 +199,7 @@
   .listing-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   @media (max-width: 600px) { .listing-groups { grid-template-columns: 1fr; } }
   .listing-group { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-  .listing-group-label { font-size: 10.5px; color: #8a8a80; }
-  .listing-group-name { font-weight: 600; font-size: 13px; margin-top: -4px; }
+  .listing-group-name { font-weight: 600; font-size: 13px; }
   .listing-group-count { font-size: 10.5px; color: #6b6b6b; margin-top: -4px; }
   .ag-header {
     padding: 4px 4px 10px 4px;
@@ -344,6 +350,7 @@
   const AG_STATUS = __AG_STATUS_JSON__;        // display AG name -> "ENABLED"/"PAUSED", current account state
   const RAW_AG_GROUPS = __RAW_AG_GROUPS_JSON__; // [{raw, displays:[{ag, sublabel}]}] -- groups display AGs sharing one real Google Ads asset group (see generate_board.py)
   const RAW_AG_OF = Object.fromEntries(RAW_AG_GROUPS.flatMap(g => g.displays.map(d => [d.ag, g.raw]))); // display AG name -> raw Google Ads asset_group.name, derived from RAW_AG_GROUPS above
+  const RAW_AG_CAMPAIGN = __RAW_AG_CAMPAIGN_JSON__; // raw asset_group.name -> campaign family ("Best-Selling"/"Second-Team"/"Gift-Scene"), derived live (see generate_board.py's fetch_raw_ag_campaigns) -- drives which CP zone each AG column nests under
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
   const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
   const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
@@ -510,6 +517,24 @@
       return { campaign, cost, cv, value, roas: cost > 0 ? (value / cost * 100) : null };
     }).filter(g => g.cost > 0);
 
+    // Nests each shown raw-AG group under its real parent CP (campaign), using RAW_AG_CAMPAIGN
+    // (derived live, see generate_board.py's fetch_raw_ag_campaigns) instead of relying on the CP
+    // row and the AG grid happening to line up -- they used to be two independently-ordered lists
+    // with no structural relationship, which visibly misled (即納・ベストセラー, really under
+    // Best-Selling, rendered directly below the unrelated Second-Team card). A raw AG with no
+    // known CP (shouldn't happen given the account structure today, but stay safe against a future
+    // gap) falls into a trailing unzoned group instead of being silently dropped.
+    const zones = CAMPAIGN_ORDER.map(campaign => ({
+      campaign,
+      campaignStats: shownCampaignGroups.find(g => g.campaign === campaign) || null,
+      rawGroups: shownRawGroups.filter(g => RAW_AG_CAMPAIGN[g.raw] === campaign),
+    })).filter(z => z.rawGroups.length > 0);
+    const zonedRaws = new Set(zones.flatMap(z => z.rawGroups.map(g => g.raw)));
+    const unzonedRawGroups = shownRawGroups.filter(g => !zonedRaws.has(g.raw));
+    if (unzonedRawGroups.length > 0){
+      zones.push({ campaign: null, campaignStats: null, rawGroups: unzonedRawGroups });
+    }
+
     const hero = document.createElement("div");
     hero.className = "hero-bar";
     hero.innerHTML = `
@@ -643,25 +668,6 @@
     `;
     root.appendChild(legend);
 
-    if (shownCampaignGroups.length > 0){
-      const campaignBar = document.createElement("div");
-      campaignBar.className = "campaign-bar";
-      campaignBar.innerHTML = shownCampaignGroups.map(g => `
-        <div class="campaign-card ${grade(g.roas)}">
-          <div class="campaign-name">${g.campaign}</div>
-          <div class="campaign-metrics">
-            <span class="roas-badge small ${grade(g.roas)}">${pct(g.roas)}</span>
-            <span>費用 ${yen(g.cost)}</span>
-            <span>CV ${g.cv.toFixed(1)}</span>
-          </div>
-        </div>
-      `).join("");
-      root.appendChild(campaignBar);
-    }
-
-    const grid = document.createElement("div");
-    grid.className = "board-grid";
-
     if (shownRawGroups.length === 0){
       const empty = document.createElement("div");
       empty.className = "notice-bar";
@@ -702,7 +708,7 @@
 
     function agHeaderHtml(name, isEnabled, trueCost, trueCv, agRoas, shoppingRatio, extraMetric){
       return `
-        <div class="ag-name">${name}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
+        <div class="ag-name">AG：${name}<span class="ag-status ${isEnabled ? 'ag-status-on' : 'ag-status-off'}">${isEnabled ? '現在稼働中' : '現在一時停止中'}</span></div>
         <div class="ag-metrics">
           <span class="roas-badge small ${grade(agRoas)}">${pct(agRoas)}</span>
           <span>費用 ${yen(trueCost)}</span>
@@ -713,7 +719,7 @@
       `;
     }
 
-    shownRawGroups.forEach(({ raw, displays }) => {
+    function buildRawGroupCol({ raw, displays }){
       const col = document.createElement("div");
 
       if (displays.length === 1){
@@ -751,8 +757,7 @@
           const lg = document.createElement("div");
           lg.className = "listing-group";
           lg.innerHTML = `
-            <div class="listing-group-label">リスティンググループ</div>
-            <div class="listing-group-name">${sublabel || ag}</div>
+            <div class="listing-group-name">LG：${sublabel || ag}</div>
             <div class="listing-group-count">商品 ${g.activeCount}件</div>
           `;
           const lgCards = document.createElement("div");
@@ -764,14 +769,45 @@
         col.appendChild(listingGroups);
       }
 
-      grid.appendChild(col);
-    });
+      return col;
+    }
 
-    root.appendChild(grid);
+    // One CP zone per campaign that has a shown raw AG, each containing only the AG columns that
+    // really belong to it (see the `zones` computation above) -- structurally guarantees the
+    // CP↔AG relationship instead of relying on two independently-ordered layouts lining up by
+    // coincidence.
+    zones.forEach(({ campaign, campaignStats, rawGroups }) => {
+      const zoneBody = document.createElement("div");
+      zoneBody.className = "board-grid";
+      rawGroups.forEach(g => zoneBody.appendChild(buildRawGroupCol(g)));
+
+      if (campaign === null){
+        // No known CP mapping for this raw AG (shouldn't happen given the account structure
+        // today) -- render its columns unzoned rather than inventing a fake CP label.
+        root.appendChild(zoneBody);
+        return;
+      }
+
+      const zone = document.createElement("div");
+      zone.className = "zone " + grade(campaignStats ? campaignStats.roas : null);
+      const zoneHeader = document.createElement("div");
+      zoneHeader.className = "zone-header";
+      zoneHeader.innerHTML = campaignStats ? `
+        <span class="zone-title">CP：${campaign}</span>
+        <span class="zone-metrics">
+          <span class="roas-badge small ${grade(campaignStats.roas)}">${pct(campaignStats.roas)}</span>
+          <span>費用 ${yen(campaignStats.cost)}</span>
+          <span>CV ${campaignStats.cv.toFixed(1)}</span>
+        </span>
+      ` : `<span class="zone-title">CP：${campaign}</span>`;
+      zone.appendChild(zoneHeader);
+      zone.appendChild(zoneBody);
+      root.appendChild(zone);
+    });
 
     const foot = document.createElement("div");
     foot.className = "footnote";
-    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。ベストセラー(似顔絵)／(名入れ)の「商品データ広告」比率は、両者がGoogle広告上は同一アセットグループのため、商品カード費用を両列合算した値を分母（asset_group実績）に対して計算しています。`;
+    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。ベストセラー(似顔絵)／(名入れ)の「商品データ広告」比率は、両者がGoogle広告上は同一AGのため、商品カード費用を両列合算した値を分母（asset_group実績）に対して計算しています。`;
     root.appendChild(foot);
   }
 

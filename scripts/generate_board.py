@@ -357,6 +357,41 @@ def fetch_enabled_ag_pairs(client, date_from, date_to):
     return pairs
 
 
+def fetch_raw_ag_campaigns(client, date_from, date_to):
+    """raw asset_group_name -> campaign-tier family ("Best-Selling"/"Second-Team"/"Gift-Scene"),
+    derived from live account structure (via campaign_family_of) rather than hardcoded, so the
+    mapping stays correct if an AG ever moves to a different campaign. When a raw AG name appears
+    under more than one campaign -- the same reused-name situation fetch_ag_status/
+    fetch_enabled_ag_pairs already guard against (e.g. a paused leftover reusing a live AG's name)
+    -- prefers whichever pairing is currently ENABLED, falling back to any match otherwise. Feeds
+    board_template.html's campaign-zone grouping (2026-08-26): each raw AG's column is nested
+    under its real parent campaign instead of the campaign summary row and the AG grid being two
+    unrelated, independently-ordered layouts (confirmed confusing live -- 即納・ベストセラー, which
+    is really under Best-Selling, was rendering directly below the unrelated Second-Team card)."""
+    rows = client.get_data(
+        "google_ads",
+        ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    best = {}  # ag_name -> (family, enabled)
+    for row in rows:
+        campaign = row.get("campaign") or ""
+        family = campaign_family_of(campaign)
+        ag_name = row.get("asset_group_name")
+        if not family or not ag_name:
+            continue
+        enabled = (
+            (row.get("campaign_status") or "").upper() == "ENABLED"
+            and (row.get("asset_group_status") or "").upper() == "ENABLED"
+        )
+        current = best.get(ag_name)
+        if current is None or (enabled and not current[1]):
+            best[ag_name] = (family, enabled)
+    return {ag_name: family for ag_name, (family, _enabled) in best.items()}
+
+
 def fetch_listing_group_filters(client, date_from, date_to):
     """Raw INCLUDE/EXCLUDE listing-group-filter leaf rows for every asset group in the account,
     regardless of status -- callers should intersect with fetch_enabled_ag_pairs to see only
@@ -733,7 +768,7 @@ def build_ag_status(raw_ag_status):
 def render_html(
     products, date_list, raw_ag_status, structure_warnings, generated_at,
     account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
-    ag_cost, ag_value, ag_cv,
+    ag_cost, ag_value, ag_cv, raw_ag_campaign,
 ):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
@@ -772,6 +807,12 @@ def render_html(
     html = html.replace("__AG_ORDER_JSON__", js_json(ag_order))
     html = html.replace("__AG_STATUS_JSON__", js_json(ag_status))
     html = html.replace("__RAW_AG_GROUPS_JSON__", js_json(raw_ag_groups))
+    # raw AG name -> campaign family, scoped to just the raw AGs actually on the board -- feeds
+    # the campaign-zone grouping (see raw_ag_groups above / fetch_raw_ag_campaigns).
+    raw_ag_campaign_scoped = {
+        g["raw"]: raw_ag_campaign[g["raw"]] for g in raw_ag_groups if g["raw"] in raw_ag_campaign
+    }
+    html = html.replace("__RAW_AG_CAMPAIGN_JSON__", js_json(raw_ag_campaign_scoped))
     html = html.replace("__CAMPAIGN_ORDER_JSON__", js_json(CAMPAIGN_DISPLAY_ORDER))
     html = html.replace("__ACCOUNT_COST_JSON__", js_json(account_cost))
     html = html.replace("__ACCOUNT_VALUE_JSON__", js_json(account_value))
@@ -859,6 +900,7 @@ def main():
         display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("cv", 0), 4) for d in date_list]
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
+    raw_ag_campaign = fetch_raw_ag_campaigns(client, str(date_from), str(date_to))
 
     if not products:
         sys.exit(
@@ -877,7 +919,7 @@ def main():
     html = render_html(
         products, date_list, raw_ag_status, structure_warnings, generated_at,
         account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
-        ag_cost, ag_value, ag_cv,
+        ag_cost, ag_value, ag_cv, raw_ag_campaign,
     )
 
     active_count = sum(1 for v in raw_ag_status.values() if v)
