@@ -181,11 +181,12 @@
   .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
   .board-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(230px, 1fr));
+    /* auto-fit (not auto-fill) collapses unused tracks to 0 width instead of reserving them, so a
+       CP zone with only 1-2 AG columns (now common since AGs nest under their own zone instead of
+       sharing one board-wide 4-column grid -- see zone-body below) doesn't leave a wide empty gap;
+       existing columns stretch to fill the row instead. */
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 14px;
-  }
-  @media (max-width: 950px) {
-    .board-grid { grid-template-columns: repeat(2, 1fr); }
   }
   .ag-col {
     background: #f7f6f2;
@@ -196,7 +197,7 @@
     gap: 9px;
   }
   .ag-col-wide { grid-column: span 2; }
-  .listing-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .listing-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-items: start; }
   @media (max-width: 600px) { .listing-groups { grid-template-columns: 1fr; } }
   .listing-group { background: rgba(0,0,0,0.03); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
   .listing-group-name { font-weight: 600; font-size: 13px; }
