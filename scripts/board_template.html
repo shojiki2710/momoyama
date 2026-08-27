@@ -247,7 +247,11 @@
     color: #fff;
   }
   .roas-badge.small { font-size: 13px; padding: 3px 10px; }
-  .roas-badge.zone { font-size: 17px; padding: 4px 13px; }
+  /* named "cp", not "zone" -- this badge sits inside a .zone container and also carries a grade
+     class (g-good/g-mid/...), so a name shared with .zone itself would let ".zone.g-mid { ... }"
+     (2026-08-27: confirmed live -- it did) match the badge too and override its solid grade
+     background with the zone's own near-transparent tint, leaving white badge text unreadable. */
+  .roas-badge.cp { font-size: 17px; padding: 4px 13px; }
   .g-good { background: #2e9e5b; }
   .g-mid  { background: #d99a1f; }
   .g-bad  { background: #d64545; }
@@ -803,7 +807,7 @@
       zoneHeader.innerHTML = campaignStats ? `
         <span class="zone-title">CP：${campaign}</span>
         <span class="zone-metrics">
-          <span class="roas-badge zone ${grade(campaignStats.roas)}">${pct(campaignStats.roas)}</span>
+          <span class="roas-badge cp ${grade(campaignStats.roas)}">${pct(campaignStats.roas)}</span>
           <span>費用 ${yen(campaignStats.cost)}</span>
           <span>CV ${campaignStats.cv.toFixed(1)}</span>
         </span>
