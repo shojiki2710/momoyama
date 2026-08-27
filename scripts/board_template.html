@@ -20,7 +20,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
+    /* nowrap on purpose: with flex-wrap:wrap, a long period line (many AG names/dates at the
+       90-day preset) made the whole hero-right block drop to its own line -- and alone on that
+       line, "space-between" left-aligns a single item instead of keeping it flush right. Keeping
+       the two blocks on one row and letting hero-left's own text wrap internally (min-width:0
+       below) avoids that entirely. */
+    flex-wrap: nowrap;
     gap: 16px;
     padding: 20px 24px;
     margin-bottom: 10px;
@@ -28,6 +33,7 @@
     border-radius: 16px;
     color: #fff;
   }
+  .hero-left { flex: 1 1 auto; min-width: 0; }
   .hero-left .title { font-weight: 700; font-size: 18px; opacity: 0.85; margin-bottom: 4px; }
   .hero-left .period { font-size: 12px; opacity: 0.6; }
   .badge-auto {
@@ -40,7 +46,7 @@
     background: rgba(255,255,255,0.15);
     vertical-align: middle;
   }
-  .hero-right { text-align: right; }
+  .hero-right { flex: 0 0 auto; text-align: right; }
   .hero-roas-label { font-size: 11.5px; opacity: 0.75; letter-spacing: 0.03em; margin-bottom: 2px; }
   .hero-roas-value { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
   .hero-roas-value .unit { font-size: 22px; font-weight: 700; margin-left: 2px; }
@@ -241,6 +247,7 @@
     color: #fff;
   }
   .roas-badge.small { font-size: 13px; padding: 3px 10px; }
+  .roas-badge.zone { font-size: 17px; padding: 4px 13px; }
   .g-good { background: #2e9e5b; }
   .g-mid  { background: #d99a1f; }
   .g-bad  { background: #d64545; }
@@ -796,7 +803,7 @@
       zoneHeader.innerHTML = campaignStats ? `
         <span class="zone-title">CP：${campaign}</span>
         <span class="zone-metrics">
-          <span class="roas-badge small ${grade(campaignStats.roas)}">${pct(campaignStats.roas)}</span>
+          <span class="roas-badge zone ${grade(campaignStats.roas)}">${pct(campaignStats.roas)}</span>
           <span>費用 ${yen(campaignStats.cost)}</span>
           <span>CV ${campaignStats.cv.toFixed(1)}</span>
         </span>
