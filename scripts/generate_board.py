@@ -73,7 +73,10 @@ GOOGLE_ADS_ACCOUNT = "795-169-0216"  # DirectApiClient strips dashes before call
 MERCHANT_ACCOUNT = "273780463"
 SHOPIFY_SHOP_DOMAIN = "momoyama7245.myshopify.com"
 HISTORY_DAYS = 90  # rolling window baked into the page; bounds the custom date-range picker
-DEFAULT_PRESET_DAYS = 7  # initial selection shown on page load
+DEFAULT_PRESET_DAYS = 14  # initial selection shown on page load -- the primary LG入れ替え judgment
+# window (2026-08-28, per funato-san): 2 full weekly cycles smooths day-of-week noise while
+# staying responsive to real recent changes, unlike 30/90d. See Notion「ショッピング広告LGチュー
+# ニング手順」for the operational judgment principles this period feeds into.
 JST = ZoneInfo("Asia/Tokyo")
 
 # campaign name must contain at least one of these substrings to be in scope.

@@ -631,7 +631,10 @@
 
     const periodBar = document.createElement("div");
     periodBar.className = "period-bar";
-    const presets = [7, 30, 90].filter(d => d <= DATES.length);
+    // 14日はLG（リスティンググループ）商品構成の入れ替えジャッジの主指標として2026-08-28追加
+    // -- 週次サイクルを2周カバーし曜日変動を均せる一方、30/90日ほど直近の変化に鈍感にならない
+    // （運用原則の詳細はNotion「ショッピング広告LGチューニング手順」参照）。
+    const presets = [7, 14, 30, 90].filter(d => d <= DATES.length);
     periodBar.innerHTML = `
       <div class="period-presets">
         ${presets.map(d => `<button class="period-btn${activePresetDays===d ? ' active' : ''}" data-days="${d}">直近${d}日</button>`).join("")}
