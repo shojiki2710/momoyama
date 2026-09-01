@@ -1002,8 +1002,18 @@ def main():
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
     raw_ag_campaign = fetch_raw_ag_campaigns(client, str(date_from), str(date_to))
-    shopify_line_items = fetch_shopify_line_items(client, str(date_from), str(date_to))
-    opportunity_products = build_opportunity_products(product_labels, performance, shopify_line_items, date_list)
+    # Best-effort: the 未広告・要検討 opportunity list is a nice-to-have on top of the core board,
+    # not something worth taking the whole run down for. Confirmed 2026-08-31 that the Shopify
+    # app's current scopes don't include `read_products` (needed for lineItem.variant.product),
+    # which fails this specific query -- until that scope is granted (Dev Dashboard, likely also
+    # needing a re-authorize like read_all_orders did, see shopify_client.py's docstring), degrade
+    # to an empty opportunity list instead of crashing the entire generation.
+    try:
+        shopify_line_items = fetch_shopify_line_items(client, str(date_from), str(date_to))
+        opportunity_products = build_opportunity_products(product_labels, performance, shopify_line_items, date_list)
+    except Exception as e:
+        print(f"WARNING: skipping 未広告・要検討 opportunity list -- {e}")
+        opportunity_products = []
 
     if not products:
         sys.exit(
