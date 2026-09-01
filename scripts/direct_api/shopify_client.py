@@ -90,6 +90,82 @@ def _graphql(shop_domain, access_token, query, variables):
     return payload["data"]
 
 
+_LINE_ITEMS_QUERY = """
+query($cursor: String, $q: String!) {
+  orders(first: 250, after: $cursor, query: $q, sortKey: CREATED_AT) {
+    edges {
+      cursor
+      node {
+        createdAt
+        cancelledAt
+        lineItems(first: 250) {
+          edges {
+            node {
+              currentQuantity
+              originalTotalSet { shopMoney { amount } }
+              variant { id product { id } }
+            }
+          }
+        }
+      }
+    }
+    pageInfo { hasNextPage }
+  }
+}
+"""
+
+
+def fetch_line_item_quantities(access_token, shop_domain, date_from, date_to):
+    """{item_id: {date_str: {qty, revenue}}}, aggregated across every order's line items
+    regardless of channel/referrer -- feeds the "未広告・要検討" opportunity list added
+    2026-08-31: products the store actually sells in volume that current Google Ads item-level
+    spend doesn't reflect at all.
+
+    item_id is built from the line item's product/variant numeric Shopify IDs as
+    "shopify_jp_<productId>_<variantId>", matching the same convention Merchant Center/Google Ads
+    item_ids already use elsewhere in this pipeline (confirmed 2026-07-28, see
+    merchant_client.normalize_product) -- lets this join directly against product_labels/
+    performance without a separate lookup table.
+
+    currentQuantity (not the original ordered quantity) nets out later refunds/removals, mirroring
+    fetch_daily_total_sales' use of currentTotalPriceSet for the same reason. Line items without a
+    variant (manual/custom line items, or a since-deleted product) are skipped -- they have no
+    Shopify catalog product to attribute the sale to. Assumes no single order has more than 250
+    distinct line items (unpaginated `first: 250` on lineItems) -- a safe assumption for this
+    store's typical gift-shop order sizes."""
+    q = f"created_at:>='{date_from}T00:00:00+09:00' AND created_at:<='{date_to}T23:59:59+09:00'"
+    totals = {}
+    cursor = None
+    while True:
+        data = _graphql(shop_domain, access_token, _LINE_ITEMS_QUERY, {"cursor": cursor, "q": q})
+        orders = data["orders"]
+        edges = orders["edges"]
+        for edge in edges:
+            node = edge["node"]
+            if node["cancelledAt"]:
+                continue
+            created_utc = datetime.strptime(node["createdAt"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            date_str = created_utc.astimezone(JST).date().isoformat()
+            for li_edge in node["lineItems"]["edges"]:
+                li = li_edge["node"]
+                variant = li.get("variant")
+                if not variant or not variant.get("product"):
+                    continue
+                product_num = variant["product"]["id"].rsplit("/", 1)[-1]
+                variant_num = variant["id"].rsplit("/", 1)[-1]
+                item_id = f"shopify_jp_{product_num}_{variant_num}"
+                qty = li.get("currentQuantity") or 0
+                revenue = float(li["originalTotalSet"]["shopMoney"]["amount"])
+                by_date = totals.setdefault(item_id, {})
+                day = by_date.setdefault(date_str, {"qty": 0, "revenue": 0.0})
+                day["qty"] += qty
+                day["revenue"] += revenue
+        if not orders["pageInfo"]["hasNextPage"] or not edges:
+            break
+        cursor = edges[-1]["cursor"]
+    return totals
+
+
 def fetch_daily_total_sales(access_token, shop_domain, date_from, date_to):
     """{date_str: total_sales}, bucketed by the shop's own JST calendar day (matching
     generate_board.py's date_list). Cancelled orders are excluded; current_total_price_set

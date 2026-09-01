@@ -350,6 +350,33 @@
     color: #9a9a9a;
     line-height: 1.7;
   }
+  /* "未広告・要検討" opportunity list -- deliberately NOT the ROAS grade colors (g-good/g-mid/
+     g-bad) used everywhere else on the board, since this isn't a performance grade: it's a
+     discovery signal (real store sales with ~no ad spend), so it gets its own blue accent to
+     avoid implying a ROAS judgment that doesn't apply here. */
+  .opp-section {
+    border-radius: 16px;
+    padding: 16px;
+    margin: 4px 0 18px;
+    border: 1.5px solid rgba(94, 122, 214, 0.35);
+    background: rgba(94, 122, 214, 0.045);
+  }
+  .opp-header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .opp-title { font-weight: 700; font-size: 16px; color: #2b3378; }
+  .opp-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #4d5fc4; color: #fff; }
+  .opp-desc { font-size: 11.5px; color: #5a5f78; margin-bottom: 14px; line-height: 1.6; }
+  .opp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  @media (max-width: 950px) { .opp-grid { grid-template-columns: repeat(2, 1fr); } }
+  .opp-card { background: #ffffff; border-radius: 10px; padding: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.07); border-left: 4px solid #6b7fd7; position: relative; }
+  .opp-rank { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 800; color: #6b7fd7; background: rgba(107,127,215,0.1); border-radius: 999px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+  .opp-thumb { width: 100%; aspect-ratio: 1; border-radius: 8px; background: #eee; object-fit: cover; margin-bottom: 8px; display: block; }
+  .opp-qty { display: inline-block; font-size: 15px; font-weight: 800; color: #fff; background: #4d5fc4; padding: 2px 10px; border-radius: 999px; margin-bottom: 6px; }
+  .opp-qty .unit { font-size: 11px; font-weight: 700; margin-left: 1px; }
+  .opp-title-text { font-size: 11.5px; line-height: 1.4; font-weight: 600; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .opp-stats { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 6px; }
+  .opp-chip { display: inline-flex; align-items: baseline; gap: 3px; padding: 2px 8px; border-radius: 999px; background: #f4f3ef; border: 1px solid rgba(0,0,0,0.08); font-size: 10.5px; font-weight: 700; color: #4d5449; white-space: nowrap; }
+  .opp-chip .stat-label { font-weight: 500; font-size: 9px; color: #8a8f84; }
+  .opp-reason { font-size: 9.5px; font-weight: 700; color: #a43a3a; background: rgba(214,69,69,0.08); display: inline-block; padding: 2px 7px; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -363,6 +390,8 @@
   const RAW_AG_GROUPS = __RAW_AG_GROUPS_JSON__; // [{raw, displays:[{ag, sublabel}]}] -- groups display AGs sharing one real Google Ads asset group (see generate_board.py)
   const RAW_AG_OF = Object.fromEntries(RAW_AG_GROUPS.flatMap(g => g.displays.map(d => [d.ag, g.raw]))); // display AG name -> raw Google Ads asset_group.name, derived from RAW_AG_GROUPS above
   const RAW_AG_CAMPAIGN = __RAW_AG_CAMPAIGN_JSON__; // raw asset_group.name -> campaign family ("Best-Selling"/"Second-Team"/"Gift-Scene"), derived live (see generate_board.py's fetch_raw_ag_campaigns) -- drives which CP zone each AG column nests under
+  const OPPORTUNITY_PRODUCTS = __OPPORTUNITY_PRODUCTS_JSON__; // [{id,title,img,qty:[],revenue:[],adCost:[],reason}] aligned to DATES -- every product with real Shopify sales, for the "未広告・要検討" TOP10 (see generate_board.py's build_opportunity_products)
+  const OPPORTUNITY_AD_COST_FLOOR = 100; // yen -- "実質ゼロ" cutoff for ad spend in the selected range, see build_opportunity_products
   const CAMPAIGN_ORDER = __CAMPAIGN_ORDER_JSON__; // preferred campaign column order
   const CAMPAIGN_COST = __CAMPAIGN_COST_JSON__;   // {family: [daily cost, aligned to DATES]} -- TRUE per-campaign totals, independent of product/AG classification
   const CAMPAIGN_VALUE = __CAMPAIGN_VALUE_JSON__; // {family: [daily conversion value]}
@@ -820,9 +849,58 @@
       root.appendChild(zone);
     });
 
+    // 「未広告・要検討」TOP10: products with real Shopify sales in the selected range whose ad
+    // cost in that SAME range is ~0 (see OPPORTUNITY_AD_COST_FLOOR/build_opportunity_products) --
+    // 広告ではないルートで売れている商品を認知し、広告投入することでパフォーマンスを上げられるの
+    // ではないか、という仮説（2026-08-31、ふなとさん）の検証材料。Recomputed per period preset
+    // just like everything else on the board, not a fixed window.
+    const opportunityCandidates = OPPORTUNITY_PRODUCTS.map(p => {
+      let qty = 0, revenue = 0, adCost = 0;
+      for (let i = rangeStart; i <= rangeEnd; i++){
+        qty += p.qty[i] || 0;
+        revenue += p.revenue[i] || 0;
+        adCost += p.adCost[i] || 0;
+      }
+      return { p, qty, revenue, adCost };
+    })
+      .filter(x => x.qty > 0 && x.adCost < OPPORTUNITY_AD_COST_FLOOR)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10);
+
+    if (opportunityCandidates.length > 0){
+      const opp = document.createElement("div");
+      opp.className = "opp-section";
+      opp.innerHTML = `
+        <div class="opp-header">
+          <span class="opp-title">🔍 未広告・要検討 TOP10</span>
+          <span class="opp-badge">数量ベース・${startDate}〜${endDate}</span>
+        </div>
+        <p class="opp-desc">対象期間中の広告費が実質ゼロ（¥${OPPORTUNITY_AD_COST_FLOOR}未満）にもかかわらず、ももやま本店全体では販売数量の多い商品です。広告未実施のまま売れている＝LGへの新規投入候補、または既存LGからの除外・除外解除の判断材料になります。</p>
+        <div class="opp-grid"></div>
+      `;
+      const oppGrid = opp.querySelector(".opp-grid");
+      opportunityCandidates.forEach(({ p, qty, revenue }, i) => {
+        const card = document.createElement("div");
+        card.className = "opp-card";
+        const thumb = p.img ? `<img class="opp-thumb" src="${p.img}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="opp-thumb"></div>`;
+        card.innerHTML = `
+          <div class="opp-rank">${i + 1}</div>
+          ${thumb}
+          <div class="opp-qty">${qty}<span class="unit">個</span></div>
+          <div class="opp-title-text" title="${p.title}">${p.title}</div>
+          <div class="opp-stats">
+            <span class="opp-chip"><span class="stat-label">売上</span>${yen(revenue)}</span>
+          </div>
+          <span class="opp-reason">${p.reason}</span>
+        `;
+        oppGrid.appendChild(card);
+      });
+      root.appendChild(opp);
+    }
+
     const foot = document.createElement("div");
     foot.className = "footnote";
-    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。ベストセラー(似顔絵)／(名入れ)の「商品データ広告」比率は、両者がGoogle広告上は同一AGのため、商品カード費用を両列合算した値を分母（asset_group実績）に対して計算しています。`;
+    foot.innerHTML = `データソース：Google Ads API（asset_group_status／campaign_status／item_id別・日別実績／campaign別実績）・Google Merchant API（product_custom_label_0）・Shopify Admin API（本店全体の売上高・商品別注文明細）に直接接続（直近${DATES.length}日分を保持）。基準線${ROAS_GOOD}%は新規顧客優先入札ボーナス除去後の本来実力ROASの下限値（Search/Shopping面）。最終取得：${GENERATED_AT}。AG見出しの費用とカード内訳の合計は、検索・ディスプレイ等の非商品広告費用分だけ一致しない場合があります。ベストセラー(似顔絵)／(名入れ)の「商品データ広告」比率は、両者がGoogle広告上は同一AGのため、商品カード費用を両列合算した値を分母（asset_group実績）に対して計算しています。`;
     root.appendChild(foot);
   }
 

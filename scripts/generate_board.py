@@ -259,6 +259,13 @@ class DirectApiClient:
             if fields == ("date", "total_sales"):
                 totals = self._shopify.fetch_daily_total_sales(self._shopify_token, account, date_from, date_to)
                 return [{"date": d, "total_sales": v} for d, v in totals.items()]
+            if fields == ("item_id", "date", "qty", "revenue"):
+                totals = self._shopify.fetch_line_item_quantities(self._shopify_token, account, date_from, date_to)
+                return [
+                    {"item_id": item_id, "date": d, "qty": day["qty"], "revenue": day["revenue"]}
+                    for item_id, by_date in totals.items()
+                    for d, day in by_date.items()
+                ]
 
         raise RuntimeError(f"DirectApiClient has no mapping for connector={connector!r} fields={fields!r}")
 
@@ -282,6 +289,7 @@ class FixtureClient:
         ("shopify", ("date", "total_sales")): "step5_shopify_daily_sales.json",
         ("google_ads", ("campaign", "asset_group", "included", "custom_label_index", "custom_label_value")): "step7_listing_group_filters.json",
         ("google_ads", ("campaign", "asset_group_name", "date", "cost", "conversions", "conversions_value")): "step8_ag_daily_totals.json",
+        ("shopify", ("item_id", "date", "qty", "revenue")): "step9_shopify_line_items.json",
     }
 
     def get_data(self, connector, fields, accounts, date_from, date_to):
@@ -705,6 +713,95 @@ def fetch_shopify_daily_sales(client, date_from, date_to):
     return totals
 
 
+def fetch_shopify_line_items(client, date_from, date_to):
+    """{item_id: {date_str: {qty, revenue}}}, per-product store-wide sales regardless of channel/
+    referrer -- feeds the "未広告・要検討" opportunity list (added 2026-08-31, per ふなとさんの仮
+    説: 広告ではないルートで売れている商品を認知し、広告投入することでパフォーマンスを上げられる
+    のではないか). See shopify_client.fetch_line_item_quantities for the item_id join convention."""
+    rows = client.get_data(
+        "shopify",
+        ["item_id", "date", "qty", "revenue"],
+        accounts=[SHOPIFY_SHOP_DOMAIN],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    totals = {}
+    for row in rows:
+        item_id = row.get("item_id")
+        date = row.get("date")
+        if not item_id or not date:
+            continue
+        by_date = totals.setdefault(item_id, {})
+        day = by_date.setdefault(date, {"qty": 0, "revenue": 0.0})
+        day["qty"] += row.get("qty") or 0
+        day["revenue"] += float(row.get("revenue") or 0)
+    return totals
+
+
+def opportunity_reason(label):
+    """Short display string explaining WHY a product qualifies for the "未広告・要検討" list --
+    i.e. why it currently gets ~no Google Ads spend, for whichever of the 3 real causes applies
+    (合意 2026-08-28/31, ふなとさん):
+      - no custom_label_0 at all -> never routed to any AG/label mapping
+      - a deliberately-unmapped label (excluded/single, see KNOWN_UNMAPPED_LABELS)
+      - a recognized label that DOES map to a display AG, but real spend on this specific item is
+        ~0 anyway (the AG isn't actually delivering for it -- "実質的に配信されていない", the
+        precise case that motivated defining the opportunity threshold on ad cost rather than on
+        nominal AG/label targeting)."""
+    if not label:
+        return "ラベル未設定"
+    if label in KNOWN_UNMAPPED_LABELS:
+        return f"{label}（意図的に対象外）"
+    if label not in LABEL_TO_DISPLAY_AG:
+        return f"未対応ラベル「{label}」"
+    return f"{LABEL_TO_DISPLAY_AG[label]}向けだが配信実績なし"
+
+
+def build_opportunity_products(product_labels, performance, shopify_line_items, date_list):
+    """Every Merchant Center product with any real store-wide sales in the tracked window,
+    carrying its own daily ad-cost array (0 for products/days with no Google Ads item-level
+    performance at all) alongside its daily Shopify sales qty/revenue.
+
+    Deliberately unfiltered by an ad-spend threshold here -- mirrors build_products' own "send
+    everything, let the client decide per selected range" design (see board_template.html) so
+    every period preset (7/14/30/90d) recomputes the TOP10 "未広告・要検討" list correctly without
+    a refetch. "Ad cost ~= 0 in the viewer-selected range" is what actually defines "not
+    effectively advertised" -- not nominal AG/label targeting -- because a product can be nominally
+    covered by a broad catch-all AG (see current_target_ag) yet still get ~0 real delivery within
+    it (confirmed live: many of ２軍's 90+ eligible products get no spend in a given window)."""
+    ad_cost_by_item = {}
+    for (_bucket, item_id), by_date in performance.items():
+        day_costs = ad_cost_by_item.setdefault(item_id, {})
+        for d, day in by_date.items():
+            day_costs[d] = day_costs.get(d, 0.0) + day["cost"]
+
+    products = []
+    for item_id, by_date in shopify_line_items.items():
+        info = product_labels.get(item_id)
+        if not info:
+            continue
+        total_qty = sum(d["qty"] for d in by_date.values())
+        if total_qty <= 0:
+            continue
+        ad_costs = ad_cost_by_item.get(item_id, {})
+        qty_arr, revenue_arr, cost_arr = [], [], []
+        for d in date_list:
+            day = by_date.get(d)
+            qty_arr.append(day["qty"] if day else 0)
+            revenue_arr.append(round(day["revenue"], 2) if day else 0)
+            cost_arr.append(round(ad_costs.get(d, 0.0), 2))
+        products.append({
+            "id": item_id,
+            "title": info["title"] or item_id,
+            "img": info["image"],
+            "qty": qty_arr,
+            "revenue": revenue_arr,
+            "adCost": cost_arr,
+            "reason": opportunity_reason(info["label"]),
+        })
+    return products
+
+
 def build_products(product_labels, performance, date_list, targeting_index):
     """Each product carries cost/cv/value as arrays aligned index-for-index with date_list, so
     the page can sum any contiguous slice client-side without refetching anything.
@@ -771,7 +868,7 @@ def build_ag_status(raw_ag_status):
 def render_html(
     products, date_list, raw_ag_status, structure_warnings, generated_at,
     account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
-    ag_cost, ag_value, ag_cv, raw_ag_campaign,
+    ag_cost, ag_value, ag_cv, raw_ag_campaign, opportunity_products,
 ):
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
@@ -826,6 +923,7 @@ def render_html(
     html = html.replace("__AG_COST_JSON__", js_json(ag_cost))
     html = html.replace("__AG_VALUE_JSON__", js_json(ag_value))
     html = html.replace("__AG_CV_JSON__", js_json(ag_cv))
+    html = html.replace("__OPPORTUNITY_PRODUCTS_JSON__", js_json(opportunity_products))
     html = html.replace("__STRUCTURE_WARNINGS_JSON__", js_json(structure_warnings))
     html = html.replace("__GENERATED_AT__", js_string_escape(generated_at))
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
@@ -904,6 +1002,8 @@ def main():
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
     raw_ag_campaign = fetch_raw_ag_campaigns(client, str(date_from), str(date_to))
+    shopify_line_items = fetch_shopify_line_items(client, str(date_from), str(date_to))
+    opportunity_products = build_opportunity_products(product_labels, performance, shopify_line_items, date_list)
 
     if not products:
         sys.exit(
@@ -922,7 +1022,7 @@ def main():
     html = render_html(
         products, date_list, raw_ag_status, structure_warnings, generated_at,
         account_cost, account_value, shop_sales, campaign_cost, campaign_value, campaign_cv,
-        ag_cost, ag_value, ag_cv, raw_ag_campaign,
+        ag_cost, ag_value, ag_cv, raw_ag_campaign, opportunity_products,
     )
 
     active_count = sum(1 for v in raw_ag_status.values() if v)
