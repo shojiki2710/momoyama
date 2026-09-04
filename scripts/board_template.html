@@ -36,6 +36,10 @@
   .hero-left { flex: 1 1 auto; min-width: 0; }
   .hero-left .title { font-weight: 700; font-size: 18px; opacity: 0.85; margin-bottom: 4px; }
   .hero-left .period { font-size: 12px; opacity: 0.6; }
+  /* Pulled out of the long 自動取得パイプライン sentence (2026-09-04, ふなとさん) -- last-updated
+     is something worth checking at a glance every time, and was getting lost mid-paragraph down
+     in the green notice bar. Slightly more opaque/bold than .period so it doesn't just blend in. */
+  .hero-left .updated { font-size: 12px; opacity: 0.8; font-weight: 600; margin-top: 4px; }
   .badge-auto {
     display: inline-block;
     margin-left: 8px;
@@ -601,6 +605,7 @@
       <div class="hero-left">
         <div class="title">リスティンググループ商品ボード｜ももやま<span class="badge-auto">自動取得パイプライン</span></div>
         <div class="period">${periodText}</div>
+        <div class="updated">最終更新：${GENERATED_AT}</div>
       </div>
       <div class="hero-right">
         <div class="hero-roas-label">全体ROAS</div>
@@ -674,7 +679,7 @@
 
     const notice = document.createElement("div");
     notice.className = "notice-bar";
-    notice.innerHTML = `✅ 自動取得パイプライン：①Google Merchant Center(product_custom_label_0)で商品⇄AGラベルを取得 → ②Google Ads(item_id別・日別)で費用・コンバージョンを取得 → ③突合。毎朝自動更新（最終更新：${GENERATED_AT}）。表示期間は下のボタンで自由に切り替え可能（データは直近${DATES.length}日分を保持）。各AG列は選択期間内に実績があるものだけを表示（現在の稼働状況は各列に表示）。`;
+    notice.innerHTML = `✅ 自動取得パイプライン：①Google Merchant Center(product_custom_label_0)で商品⇄AGラベルを取得 → ②Google Ads(item_id別・日別)で費用・コンバージョンを取得 → ③突合。毎朝自動更新。表示期間は下のボタンで自由に切り替え可能（データは直近${DATES.length}日分を保持）。各AG列は選択期間内に実績があるものだけを表示（現在の稼働状況は各列に表示）。`;
     root.appendChild(notice);
 
     const periodBar = document.createElement("div");
