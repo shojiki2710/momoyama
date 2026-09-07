@@ -791,19 +791,39 @@
       const col = document.createElement("div");
 
       if (displays.length === 1){
-        // Common case: this raw AG has exactly one display column -- unchanged from before.
+        // Common case: this raw AG has exactly one display column.
         const g = agGroupsByAg[displays[0].ag];
         col.className = "ag-col";
         const isEnabled = AG_STATUS[g.ag] === "ENABLED";
         const header = document.createElement("div");
         header.className = "ag-header";
-        header.innerHTML = agHeaderHtml(g.ag, isEnabled, g.trueCost, g.trueCv, g.agRoas, g.shoppingRatio, `<span>商品 ${g.activeCount}件</span>`);
+        // 商品N件 moved out of the header (see extraMetric="" above) and down into the LG-shell's
+        // count line below, so this branch's header carries the exact same metrics as the multi-
+        // LG branch's shared header -- keeping them the same height too, not just visually similar
+        // (2026-09-07, ふなとさん: with 商品N件 still in the header, ag-metrics wrapped onto an
+        // extra line in this branch's narrower single-width column but not in the wide branch's
+        // double-width one, leaving a residual ~21px misalignment even after the LG-shell fix
+        // below on its own).
+        header.innerHTML = agHeaderHtml(g.ag, isEnabled, g.trueCost, g.trueCv, g.agRoas, g.shoppingRatio, "");
         col.appendChild(header);
 
+        // Wrapped in the same .listing-group shell as the multi-LG branch below (label hidden,
+        // since a solo AG has no LG name to show) purely so this column's card list starts at the
+        // same y-position as a sibling column that DOES have a real LG split within the same CP
+        // zone -- e.g. AG：即納・ベストセラー (1 LG, this branch) sitting next to AG：ベストセラー
+        // (2 LGs: 似顔絵/名入れ, the else branch) previously looked misaligned since only the
+        // latter had the extra "LG：.../商品N件" header line pushing its cards down.
+        const lgShell = document.createElement("div");
+        lgShell.className = "listing-group";
+        lgShell.innerHTML = `
+          <div class="listing-group-name" style="visibility:hidden">LG：placeholder</div>
+          <div class="listing-group-count">商品 ${g.activeCount}件</div>
+        `;
         const cardsWrap = document.createElement("div");
         cardsWrap.className = "ag-cards";
         renderItemCards(cardsWrap, g.items);
-        col.appendChild(cardsWrap);
+        lgShell.appendChild(cardsWrap);
+        col.appendChild(lgShell);
       } else {
         // Multiple display AGs share ONE real Google Ads asset group (currently only ベストセラー's
         // 似顔絵/名入れ split) -- one outer card carries the true AG-level badges (identical across
