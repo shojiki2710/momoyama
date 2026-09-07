@@ -558,7 +558,7 @@
     // Currently-active groups first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
     const shownRawGroups = RAW_AG_GROUPS
-      .map(g => ({ raw: g.raw, displays: g.displays.filter(d => (agGroupsByAg[d.ag]?.cost || 0) > 0) }))
+      .map(g => ({ raw: g.raw, soloLabel: g.soloLabel, displays: g.displays.filter(d => (agGroupsByAg[d.ag]?.cost || 0) > 0) }))
       .filter(g => g.displays.length > 0)
       .sort((a, b) => (AG_STATUS[b.displays[0].ag] === "ENABLED") - (AG_STATUS[a.displays[0].ag] === "ENABLED"));
 
@@ -787,7 +787,7 @@
       `;
     }
 
-    function buildRawGroupCol({ raw, displays }){
+    function buildRawGroupCol({ raw, displays, soloLabel }){
       const col = document.createElement("div");
 
       if (displays.length === 1){
@@ -807,16 +807,17 @@
         header.innerHTML = agHeaderHtml(g.ag, isEnabled, g.trueCost, g.trueCv, g.agRoas, g.shoppingRatio, "");
         col.appendChild(header);
 
-        // Wrapped in the same .listing-group shell as the multi-LG branch below (label hidden,
-        // since a solo AG has no LG name to show) purely so this column's card list starts at the
-        // same y-position as a sibling column that DOES have a real LG split within the same CP
-        // zone -- e.g. AG：即納・ベストセラー (1 LG, this branch) sitting next to AG：ベストセラー
-        // (2 LGs: 似顔絵/名入れ, the else branch) previously looked misaligned since only the
-        // latter had the extra "LG：.../商品N件" header line pushing its cards down.
+        // Wrapped in the same .listing-group shell as the multi-LG branch below -- both so this
+        // column's card list starts at the same y-position as a sibling column that DOES have a
+        // real LG split within the same CP zone (e.g. AG：即納・ベストセラー, 1 LG, sitting next to
+        // AG：ベストセラー's 似顔絵/名入れ split, the else branch below), and because showing the
+        // real LG name here (soloLabel; see generate_board.py's SOLO_LG_ANNOTATION) reads more
+        // clearly than a blank line (2026-09-07, ふなとさん) -- e.g. spelling out that ２軍's LG
+        // excludes ベストセラー商品 and 除外商品, since it's a catch-all, not "everything".
         const lgShell = document.createElement("div");
         lgShell.className = "listing-group";
         lgShell.innerHTML = `
-          <div class="listing-group-name" style="visibility:hidden">LG：placeholder</div>
+          <div class="listing-group-name">LG：${soloLabel || raw}</div>
           <div class="listing-group-count">商品 ${g.activeCount}件</div>
         `;
         const cardsWrap = document.createElement("div");

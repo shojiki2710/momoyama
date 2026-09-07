@@ -93,6 +93,18 @@ SECOND_TEAM_CAMPAIGN_KEYWORD = "Second-Team"
 SECOND_TEAM_RAW_AG_NAME = "２軍"
 SECOND_TEAM_DISPLAY_AG = "２軍"  # matches the real Google Ads AG name exactly (2026-08-20, per ふなとさん)
 
+# Display-only text shown as a solo (no real LG split) raw AG's own "LG：" line on the board
+# (2026-09-07, per ふなとさん: showing the real LG name there, not a blank placeholder, reads more
+# clearly). ２軍's live listing-group-filter is a catch-all that excludes anything already claimed
+# by a specific-value AG (currently ベストセラーのnigaoe/signed and 即納・ベストセラーのquickship)
+# plus explicitly-excluded products (custom_label_0="excluded") -- see
+# build_current_targeting_index/current_target_ag. Spelled out here since a bare "LG：２軍" would
+# otherwise read as if ２軍 targets every product, which it doesn't. Raw AGs not listed here just
+# show their own name (即納・ベストセラー needs no extra annotation).
+SOLO_LG_ANNOTATION = {
+    SECOND_TEAM_RAW_AG_NAME: "２軍（ベストセラー商品及び除外商品を除く）",
+}
+
 # Google Ads asset_group_name -> Merchant Center custom_label_0 value(s) it corresponds to.
 # Verified against the live account on 2026-07-28. The Best-Selling campaign has a single AG
 # ("ベストセラー"); the 似顔絵/名入れ split is a custom-label-only distinction, not a separate AG.
@@ -890,7 +902,11 @@ def render_html(
         raw_ag = DISPLAY_TO_RAW_AG.get(display_ag, display_ag)
         if raw_ag not in raw_to_group_idx:
             raw_to_group_idx[raw_ag] = len(raw_ag_groups)
-            raw_ag_groups.append({"raw": raw_ag, "displays": []})
+            raw_ag_groups.append({
+                "raw": raw_ag,
+                "displays": [],
+                "soloLabel": SOLO_LG_ANNOTATION.get(raw_ag, raw_ag),
+            })
         sublabel = display_ag.replace(raw_ag, "").strip("()") or None
         raw_ag_groups[raw_to_group_idx[raw_ag]]["displays"].append({"ag": display_ag, "sublabel": sublabel})
 
