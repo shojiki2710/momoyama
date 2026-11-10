@@ -430,6 +430,7 @@
   const ROAS_GOOD = __ROAS_GOOD__;
   const ROAS_MID = __ROAS_MID__;
   const SHOPPING_RATIO_FLOOR = __SHOPPING_RATIO_FLOOR__; // below this, non-Shopping surfaces (Discover/Display/YouTube) are eating a concerning share of an AG's true spend -- see the shopping-ratio audit banner
+  const SHOPPING_RATIO_MIN_TRUE_COST = __SHOPPING_RATIO_MIN_TRUE_COST__; // yen -- below this true cost an AG's shopping ratio is shown but never warned on (banner or red text): too little money for the ratio to mean anything. See generate_board.py
   const DEFAULT_PRESET_DAYS = __DEFAULT_PRESET_DAYS__;
   const STALE_THRESHOLD_HOURS = 30; // daily updates run ~24h apart; flag if it's been noticeably longer
 
@@ -676,7 +677,7 @@
           warnCardCost += p.cost[i] || 0;
         }
       }
-      if (warnTrueCost <= 0) continue;
+      if (warnTrueCost < SHOPPING_RATIO_MIN_TRUE_COST) continue;
       const warnRatio = warnCardCost / warnTrueCost * 100;
       if (warnRatio < SHOPPING_RATIO_FLOOR){
         shoppingRatioWarnings.push({ ag: displayAgs.join("・"), ratio: warnRatio, trueCost: warnTrueCost });
@@ -794,7 +795,7 @@
           <span>費用 ${yen(trueCost)}</span>
           <span>CV ${trueCv.toFixed(1)}</span>
           ${extraMetric}
-          <span class="${shoppingRatio !== null && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている">商品データ広告：${pct(shoppingRatio)}</span>
+          <span class="${shoppingRatio !== null && trueCost >= SHOPPING_RATIO_MIN_TRUE_COST && shoppingRatio < SHOPPING_RATIO_FLOOR ? 'metric-warn' : ''}" title="商品カード合計費用 ÷ このAGの真の費用（asset_group実績）。低いほどSearch/Display/YouTube/Discover等の非ショッピング面に費用が流れている">商品データ広告：${pct(shoppingRatio)}</span>
         </div>
       `;
     }

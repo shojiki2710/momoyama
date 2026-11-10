@@ -193,6 +193,12 @@ ROAS_MID = 300
 # ための閾値としてふなとさんと確定。
 SHOPPING_RATIO_FLOOR = 80
 
+# ショッピング比率の警告（早期警告バナー・AG見出しの赤字）を出す最低限の「真の費用」（円）。これ未満の
+# AGは、比率が極端でも金額が小さすぎて意味のある警告にならない（例：再開直後の即納・ベストセラーが
+# 直近7日の真の費用¥320・カード費用¥0＝比率0.0%で警告し続けた、2026-11-10）。比率の数値自体は常に表示し、
+# 警告（バナー・赤字）だけを抑える。2026-11-10、ふなとさん判断で¥1,000に確定。
+SHOPPING_RATIO_MIN_TRUE_COST = 1000
+
 
 def normalize_label(label):
     if not label:
@@ -1061,6 +1067,7 @@ def render_html(
     html = html.replace("__ROAS_GOOD__", str(ROAS_GOOD))
     html = html.replace("__ROAS_MID__", str(ROAS_MID))
     html = html.replace("__SHOPPING_RATIO_FLOOR__", str(SHOPPING_RATIO_FLOOR))
+    html = html.replace("__SHOPPING_RATIO_MIN_TRUE_COST__", str(SHOPPING_RATIO_MIN_TRUE_COST))
     html = html.replace("__DEFAULT_PRESET_DAYS__", str(DEFAULT_PRESET_DAYS))
     return html
 
