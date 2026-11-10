@@ -105,6 +105,16 @@ SOLO_LG_ANNOTATION = {
     SECOND_TEAM_RAW_AG_NAME: "２軍（ベストセラー商品及び除外商品を除く）",
 }
 
+# Campaign families no longer operated. Gift-Scene was retired 2026-08-01 (運用軸を「シーン」から
+# 「売れ筋」へ全面転換, see Notion 現状認識サマリ) and its AGs (還暦祝い/誕生日祝い/結婚祝い/すぐ届く)
+# were since deleted/paused -- the Ads API may or may not still return them, so the "未広告・要検討"
+# reason text (build_label_target_index) never cites them regardless. Without this, a 60th-labeled
+# product was shown as "還暦祝い向けだが配信実績なし" long after that AG stopped existing, which
+# made it look like a Merchant Center problem (Notion spec task 5, 2026-11-09).
+RETIRED_CAMPAIGN_FAMILIES = {"Gift-Scene"}
+# Short names used in "未広告・要検討" reason text (ふなとさん's own shorthand in Notion).
+CAMPAIGN_FAMILY_SHORT = {"Best-Selling": "BS", "Second-Team": "ST", "Gift-Scene": "GS"}
+
 # Google Ads asset_group_name -> Merchant Center custom_label_0 value(s) it corresponds to.
 # Verified against the live account on 2026-07-28. The Best-Selling campaign has a single AG
 # ("ベストセラー"); the 似顔絵/名入れ split is a custom-label-only distinction, not a separate AG.
@@ -483,6 +493,103 @@ def current_target_ag(label, targeting_index):
     return None
 
 
+def fetch_ag_pair_states(client, date_from, date_to):
+    """{(campaign, raw_asset_group_name): {family, campaign_enabled, ag_enabled}} for every in-scope
+    (campaign_family_of() != None) pair that isn't REMOVED -- unlike fetch_enabled_ag_pairs, which
+    only keeps pairs where both levels are ENABLED, this keeps paused ones too, because the "未広告・
+    要検討" reason text needs to tell "this product's AG is paused" apart from "its AG is live but
+    delivers nothing for it" (Notion spec task 5, 2026-11-09)."""
+    rows = client.get_data(
+        "google_ads",
+        ["campaign", "campaign_status", "asset_group_name", "asset_group_status", "asset_group_id"],
+        accounts=[GOOGLE_ADS_ACCOUNT],
+        date_from=date_from,
+        date_to=date_to,
+    )
+    states = {}
+    for row in rows:
+        campaign = row.get("campaign") or ""
+        family = campaign_family_of(campaign)
+        ag_name = row.get("asset_group_name")
+        if not family or not ag_name:
+            continue
+        campaign_status = (row.get("campaign_status") or "").upper()
+        ag_status = (row.get("asset_group_status") or "").upper()
+        if "REMOVED" in (campaign_status, ag_status):
+            continue
+        states[(campaign, ag_name)] = {
+            "family": family,
+            "campaign_enabled": campaign_status == "ENABLED",
+            "ag_enabled": ag_status == "ENABLED",
+        }
+    return states
+
+
+def build_label_target_index(filter_rows, pair_states):
+    """Per-AG listing-group rules (specific INCLUDE values, catch-all INCLUDE flag, EXCLUDE values)
+    for every non-removed, non-retired (see RETIRED_CAMPAIGN_FAMILIES) AG whose own status is
+    ENABLED. The campaign may be paused -- that's the whole point: ST (２軍) has been paused since
+    2026-09-21 but its catch-all still decides which products it WOULD serve, and the reason text
+    should say "ST停止中", not pretend those products have nowhere to go. A paused/removed *AG*
+    is skipped (its name shouldn't be cited as a reason, per the agreed 2026-11-09 policy).
+    Unlike build_current_targeting_index this does NOT require the campaign to be enabled, and is
+    only used for display text -- not for the per-card 現在配信先 badge."""
+    rules = {}
+    for row in filter_rows:
+        key = (row["campaign"], row["asset_group"])
+        state = pair_states.get(key)
+        if not state or state["family"] in RETIRED_CAMPAIGN_FAMILIES or not state["ag_enabled"]:
+            continue
+        rule = rules.setdefault(key, {
+            "raw_ag": row["asset_group"],
+            "family": state["family"],
+            "campaign_enabled": state["campaign_enabled"],
+            "specific": set(),
+            "catchall": False,
+            "excludes": set(),
+        })
+        value = row["custom_label_value"]
+        if row["included"]:
+            if value:
+                rule["specific"].add(value)
+            else:
+                rule["catchall"] = True
+        elif value:
+            rule["excludes"].add(value)
+    return list(rules.values())
+
+
+def resolve_label_target(label, rules):
+    """Best live AG for a custom_label_0 value (None/"" = unset), or None if no AG would serve it.
+    Prefers an AG whose campaign is enabled, then a specific-value match over a catch-all one.
+    Returns {name, short, campaign_enabled}; name is the display text used in reason strings."""
+    best = None
+    for rule in rules:
+        if label and label in rule["specific"]:
+            specific = True
+        elif rule["catchall"] and label not in rule["excludes"]:
+            specific = False
+        else:
+            continue
+        rank = (rule["campaign_enabled"], specific)
+        if best is None or rank > best[0] or (rank == best[0] and rule["raw_ag"] < best[1]["raw_ag"]):
+            best = (rank, rule, specific)
+    if best is None:
+        return None
+    _rank, rule, specific = best
+    if specific:
+        name = LABEL_TO_DISPLAY_AG.get(label, rule["raw_ag"])
+    elif rule["raw_ag"] == SECOND_TEAM_RAW_AG_NAME:
+        name = f"ST（{SECOND_TEAM_DISPLAY_AG}）"
+    else:
+        name = rule["raw_ag"]
+    return {
+        "name": name,
+        "short": CAMPAIGN_FAMILY_SHORT.get(rule["family"], rule["family"]),
+        "campaign_enabled": rule["campaign_enabled"],
+    }
+
+
 def fetch_all_campaigns(client, date_from, date_to):
     """Every campaign in the account, no keyword filter -- feeds the structure audit below."""
     rows = client.get_data(
@@ -750,26 +857,35 @@ def fetch_shopify_line_items(client, date_from, date_to):
     return totals
 
 
-def opportunity_reason(label):
+def opportunity_reason(label, label_target_rules):
     """Short display string explaining WHY a product qualifies for the "未広告・要検討" list --
-    i.e. why it currently gets ~no Google Ads spend, for whichever of the 3 real causes applies
-    (合意 2026-08-28/31, ふなとさん):
-      - no custom_label_0 at all -> never routed to any AG/label mapping
-      - a deliberately-unmapped label (excluded/single, see KNOWN_UNMAPPED_LABELS)
-      - a recognized label that DOES map to a display AG, but real spend on this specific item is
-        ~0 anyway (the AG isn't actually delivering for it -- "実質的に配信されていない", the
-        precise case that motivated defining the opportunity threshold on ad cost rather than on
-        nominal AG/label targeting)."""
-    if not label:
-        return "ラベル未設定"
+    i.e. why it currently gets ~no Google Ads spend.
+
+    Rewritten 2026-11-10 (Notion spec task 5, 方針はふなとさん了承 2026-11-09): the AG named here
+    now comes from the LIVE listing-group filters (build_label_target_index/resolve_label_target),
+    not from the old Gift-Scene-era LABEL_TO_DISPLAY_AG table, which kept saying
+    "還暦祝い向けだが配信実績なし" for 60th-labeled products long after that AG was deleted -- and
+    made ふなとさん suspect a Merchant Center problem. Cases, in order:
+      - a deliberately-unmapped label (excluded/single, see KNOWN_UNMAPPED_LABELS) -> as before
+      - some live AG would serve it, its campaign is ENABLED -> "<AG>向けだが配信実績なし"
+        (the AG isn't actually delivering for it: "実質的に配信されていない")
+      - some live AG would serve it, but its campaign is paused -> "<AG>向けだが、<ST/BS>停止中"
+      - no live AG would serve it -> "ラベル未設定" / "未対応ラベル「x」" / "配信先AGなし（…）"."""
     if label in KNOWN_UNMAPPED_LABELS:
         return f"{label}（意図的に対象外）"
+    target = resolve_label_target(label, label_target_rules)
+    if target:
+        if target["campaign_enabled"]:
+            return f"{target['name']}向けだが配信実績なし"
+        return f"{target['name']}向けだが、{target['short']}停止中"
+    if not label:
+        return "ラベル未設定"
     if label not in LABEL_TO_DISPLAY_AG:
         return f"未対応ラベル「{label}」"
-    return f"{LABEL_TO_DISPLAY_AG[label]}向けだが配信実績なし"
+    return f"配信先AGなし（ラベル「{label}」）"
 
 
-def build_opportunity_products(product_labels, performance, shopify_line_items, date_list):
+def build_opportunity_products(product_labels, performance, shopify_line_items, date_list, label_target_rules):
     """Every Merchant Center product with any real store-wide sales in the tracked window,
     carrying its own daily ad-cost array (0 for products/days with no Google Ads item-level
     performance at all) alongside its daily Shopify sales qty/revenue.
@@ -809,7 +925,7 @@ def build_opportunity_products(product_labels, performance, shopify_line_items, 
             "qty": qty_arr,
             "revenue": revenue_arr,
             "adCost": cost_arr,
-            "reason": opportunity_reason(info["label"]),
+            "reason": opportunity_reason(info["label"], label_target_rules),
         })
     return products
 
@@ -1026,7 +1142,12 @@ def main():
     # to an empty opportunity list instead of crashing the entire generation.
     try:
         shopify_line_items = fetch_shopify_line_items(client, str(date_from), str(date_to))
-        opportunity_products = build_opportunity_products(product_labels, performance, shopify_line_items, date_list)
+        label_target_rules = build_label_target_index(
+            listing_group_filters, fetch_ag_pair_states(client, str(date_from), str(date_to)),
+        )
+        opportunity_products = build_opportunity_products(
+            product_labels, performance, shopify_line_items, date_list, label_target_rules,
+        )
     except Exception as e:
         print(f"WARNING: skipping 未広告・要検討 opportunity list -- {e}")
         opportunity_products = []
