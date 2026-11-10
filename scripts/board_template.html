@@ -557,8 +557,20 @@
     // card with two リスティンググループ subsections instead of two duplicate-looking AG cards.
     // Currently-active groups first (left-to-right, top of the grid), paused ones after -- stable
     // sort keeps each group's original AG_DISPLAY_ORDER relative ordering intact.
+    //
+    // Which display AGs show is decided by product-card cost in range (shopping_performance_view),
+    // as before -- BUT an AG that is live and spending (asset_group true cost > 0, the same number
+    // its header badge shows) yet has no product-attributed spend in range yet is still shown, with
+    // all its display AGs. Added 2026-11-10 after 即納・ベストセラー was re-enabled on 11/9: its
+    // first spend (¥322) wasn't attributed to any product card, and the first card-attributed
+    // spend landed on 11/10 -- outside the range, which ends the day before "today" to match
+    // Google Ads' 過去N日間 -- so the column stayed hidden for a running AG.
     const shownRawGroups = RAW_AG_GROUPS
-      .map(g => ({ raw: g.raw, soloLabel: g.soloLabel, displays: g.displays.filter(d => (agGroupsByAg[d.ag]?.cost || 0) > 0) }))
+      .map(g => {
+        const withCards = g.displays.filter(d => (agGroupsByAg[d.ag]?.cost || 0) > 0);
+        const hasTrueSpend = g.displays.some(d => (agGroupsByAg[d.ag]?.trueCost || 0) > 0);
+        return { raw: g.raw, soloLabel: g.soloLabel, displays: withCards.length > 0 ? withCards : (hasTrueSpend ? g.displays : []) };
+      })
       .filter(g => g.displays.length > 0)
       .sort((a, b) => (AG_STATUS[b.displays[0].ag] === "ENABLED") - (AG_STATUS[a.displays[0].ag] === "ENABLED"));
 
