@@ -96,13 +96,13 @@ SECOND_TEAM_DISPLAY_AG = "２軍"  # matches the real Google Ads AG name exactly
 # Display-only text shown as a solo (no real LG split) raw AG's own "LG：" line on the board
 # (2026-09-07, per ふなとさん: showing the real LG name there, not a blank placeholder, reads more
 # clearly). ２軍's live listing-group-filter is a catch-all that excludes anything already claimed
-# by a specific-value AG (currently ベストセラーのnigaoe/signed and 即納・ベストセラーのquickship)
+# by a specific-value AG (currently ベストセラーのnigaoe/signed/quickship and クリスマスプレゼントのchristmas)
 # plus explicitly-excluded products (custom_label_0="excluded") -- see
 # build_current_targeting_index/current_target_ag. Spelled out here since a bare "LG：２軍" would
 # otherwise read as if ２軍 targets every product, which it doesn't. Raw AGs not listed here just
-# show their own name (即納・ベストセラー needs no extra annotation).
+# show their own name (クリスマスプレゼント needs no extra annotation).
 SOLO_LG_ANNOTATION = {
-    SECOND_TEAM_RAW_AG_NAME: "２軍（ベストセラー商品及び除外商品を除く）",
+    SECOND_TEAM_RAW_AG_NAME: "２軍（ベストセラー・クリスマス商品及び除外商品を除く）",
 }
 
 # Campaign families no longer operated. Gift-Scene was retired 2026-08-01 (運用軸を「シーン」から
@@ -123,12 +123,24 @@ AG_TO_LABELS = {
     "誕生日祝い": ["birthday"],
     "結婚祝い": ["wedding"],
     "すぐ届く": ["quick-ship"],
-    "ベストセラー": ["best_seller_nigaoe", "best_seller_signed"],
-    # New Best-Selling AG, launched under campaign "2026.4.28 P-MAX Best-Selling" -- caught by
-    # the structure audit 2026-08-20, confirmed with ふなとさん as its own display column (not
-    # folded into the existing "Best-Selling" AG's nigaoe/signed split).
-    "即納・ベストセラー": ["best_seller_quickship"],
+    # 2026-11-17: ふなとさん folded best_seller_quickship into this AG and paused the separate
+    # 即納・ベストセラー AG (id 6738869662). That AG was launched 2026-08-20 as its own column; its
+    # history (11/9-11/17) stays visible via LEGACY_MERGED_RAW_AGS below.
+    "ベストセラー": ["best_seller_nigaoe", "best_seller_signed", "best_seller_quickship"],
+    # 2026-11-18: seasonal AG (until Christmas) under the Second-Team campaign, re-enabled by
+    # ふなとさん (AG id 6736162009). Label-targeted: only custom_label_0 = christmas products
+    # (the two クリスマス限定 似顔絵マグ items); ２軍 excludes the christmas label. REMOVE this
+    # entry (or leave it paused) once the AG is stopped after Christmas.
+    "クリスマスプレゼント": ["christmas"],
 }
+
+# Raw asset groups that no longer exist as their own column but whose spend/CV/value history still
+# belongs to another raw AG's total: {surviving raw AG: [retired raw AG names merged into it]}.
+# Needed because the AG-level (asset_group resource) totals are keyed by raw AG name, so after
+# 即納・ベストセラー was folded into ベストセラー its 2026-11-09..17 spend would otherwise vanish
+# from the AG heading while its product cards (label best_seller_quickship) now sit under
+# ベストセラー -- making the heading's "商品データ広告" ratio exceed 100%.
+LEGACY_MERGED_RAW_AGS = {"ベストセラー": ["即納・ベストセラー"]}
 
 LABEL_TO_DISPLAY_AG = {
     "60th": "還暦祝い",
@@ -137,7 +149,8 @@ LABEL_TO_DISPLAY_AG = {
     "quick-ship": "すぐ届く",
     "best_seller_nigaoe": "ベストセラー(似顔絵)",
     "best_seller_signed": "ベストセラー(名入れ)",
-    "best_seller_quickship": "即納・ベストセラー",
+    "best_seller_quickship": "ベストセラー(即納)",
+    "christmas": "クリスマスプレゼント",
 }
 
 # display AG name -> raw Google Ads asset_group.name it corresponds to. ベストセラー(似顔絵) and
@@ -161,8 +174,8 @@ KNOWN_UNMAPPED_LABELS = {"excluded", "single"}
 # preferred column order when the AG is active; unexpected/new active AGs are appended after.
 AG_DISPLAY_ORDER = [
     "還暦祝い", "誕生日祝い", "結婚祝い", "すぐ届く",
-    "ベストセラー(似顔絵)", "ベストセラー(名入れ)", "即納・ベストセラー",
-    SECOND_TEAM_DISPLAY_AG,
+    "ベストセラー(似顔絵)", "ベストセラー(名入れ)", "ベストセラー(即納)",
+    SECOND_TEAM_DISPLAY_AG, "クリスマスプレゼント",
 ]
 
 CAMPAIGN_DISPLAY_ORDER = ["Best-Selling", "Second-Team", "Gift-Scene"]
@@ -1128,16 +1141,20 @@ def main():
         for family in CAMPAIGN_DISPLAY_ORDER
     }
     ag_daily_totals = fetch_ag_daily_totals(client, str(date_from), str(date_to))
+
+    def ag_total(raw_ag, date, key):
+        names = [raw_ag] + LEGACY_MERGED_RAW_AGS.get(raw_ag, [])
+        return sum(ag_daily_totals.get(n, {}).get(date, {}).get(key, 0) for n in names)
     ag_cost = {
-        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("cost", 0), 2) for d in date_list]
+        display_ag: [round(ag_total(raw_ag, d, "cost"), 2) for d in date_list]
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
     ag_value = {
-        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("value", 0), 2) for d in date_list]
+        display_ag: [round(ag_total(raw_ag, d, "value"), 2) for d in date_list]
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
     ag_cv = {
-        display_ag: [round(ag_daily_totals.get(raw_ag, {}).get(d, {}).get("cv", 0), 4) for d in date_list]
+        display_ag: [round(ag_total(raw_ag, d, "cv"), 4) for d in date_list]
         for display_ag, raw_ag in DISPLAY_TO_RAW_AG.items()
     }
     raw_ag_campaign = fetch_raw_ag_campaigns(client, str(date_from), str(date_to))
